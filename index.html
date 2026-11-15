@@ -1,0 +1,952 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Демо: недельный план производства</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --surface-2: #f2f1ec;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --ink-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --good: #0ca30c;
+    --good-wash: rgba(12,163,12,0.10);
+    --bad: #c62828;
+    --bad-wash: rgba(198,40,40,0.10);
+    --warn: #b26a00;
+    --warn-wash: rgba(250,178,25,0.18);
+    --blue: #2a78d6;
+    --green: #008300;
+    --pink: #e87ba4;
+    --amber: #eda100;
+    --teal: #1baf7a;
+    --violet: #7a5af8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --surface-2: #232322;
+      --ink: #ffffff;
+      --ink-2: #c3c2b7;
+      --ink-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255,255,255,0.10);
+      --good: #4ade4a;
+      --good-wash: rgba(74,222,74,0.14);
+      --bad: #ff6b6b;
+      --bad-wash: rgba(255,107,107,0.14);
+      --warn: #f5b74a;
+      --warn-wash: rgba(245,183,74,0.16);
+      --blue: #3987e5;
+      --green: #4ade4a;
+      --pink: #d55181;
+      --amber: #c98500;
+      --teal: #199e70;
+      --violet: #9b87ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.45;
+  }
+  .dash { max-width: 1180px; margin: 0 auto; padding: 26px 20px 56px; }
+
+  header.top { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
+  .crumb { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-muted); font-weight: 600; }
+  header.top h1 { font-size: 26px; font-weight: 700; margin: 0; letter-spacing: -0.015em; }
+  header.top .sub { color: var(--ink-2); font-size: 14px; }
+  header.top .note { color: var(--ink-muted); font-size: 12.5px; margin-top: 6px; max-width: 860px; }
+
+  .scenario-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 22px; align-items: center; }
+  .scenario-btn {
+    font: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+    color: var(--ink-2); cursor: pointer;
+  }
+  .scenario-btn:hover { background: var(--surface-2); }
+  .scenario-btn.on { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  .scenario-btn.ghost { background: transparent; }
+  .deep-link {
+    margin-left: auto; font-size: 12.5px; font-weight: 600; color: var(--blue);
+    text-decoration: none; border-bottom: 1px dashed rgba(42,120,214,.45); padding-bottom: 1px;
+  }
+  .deep-link:hover { border-bottom-style: solid; }
+
+  .verdict {
+    padding: 10px 14px; border-radius: 9px; background: var(--surface);
+    border: 1px solid var(--border); border-left: 3px solid var(--good);
+    font-size: 13.5px; font-weight: 600; color: var(--ink-2); margin: 0 0 14px;
+  }
+  .verdict.warn { border-left-color: var(--warn); }
+  .verdict.bad { border-left-color: var(--bad); }
+  .verdict b { color: var(--ink); }
+
+  h2.section-title {
+    font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--ink-muted); margin: 0 0 10px;
+  }
+  section { margin-bottom: 26px; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .kpi-tile {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .kpi-tile .label { font-size: 12.5px; color: var(--ink-2); }
+  .kpi-tile .value { font-size: 25px; font-weight: 650; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .kpi-tile .value.good { color: var(--good); }
+  .kpi-tile .value.warn { color: var(--warn); }
+  .kpi-tile .value.bad { color: var(--bad); }
+  .kpi-tile .foot { font-size: 12px; color: var(--ink-muted); }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px 14px;
+  }
+  .card-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+  .card h2 { font-size: 15px; margin: 0; font-weight: 650; }
+  .card h3 { font-size: 15px; margin: 0 0 8px; font-weight: 650; }
+  .grid-2 { display: grid; grid-template-columns: 1.25fr 1fr; gap: 12px; align-items: start; }
+  .hint { font-size: 11.5px; color: var(--ink-muted); margin-top: 8px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 2px 0 6px; }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+  .chip { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
+
+  .gantt-wrap { overflow-x: auto; }
+  .gantt-wrap svg { width: 100%; height: auto; display: block; min-width: 760px; }
+
+  .load-row { display: grid; grid-template-columns: 108px 1fr 118px; gap: 10px; align-items: center; margin: 8px 0; }
+  .load-label { display: flex; flex-direction: column; line-height: 1.15; }
+  .load-label b { font-size: 12.5px; }
+  .load-label span { font-size: 10.5px; color: var(--ink-muted); }
+  .load-track {
+    position: relative; height: 22px; background: var(--surface-2); border-radius: 4px;
+    overflow: hidden; display: flex; border: 1px solid transparent;
+  }
+  .load-track.over { border-color: var(--bad); }
+  .load-track.down { background: var(--bad-wash); }
+  .load-fill { height: 100%; }
+  .load-fill.prod { background: var(--blue); }
+  .load-fill.change { background: var(--baseline); }
+  .load-fill.over { background: var(--bad); }
+  .load-100 { position: absolute; top: -3px; bottom: -3px; width: 0; border-left: 1.5px dashed var(--ink-muted); opacity: .7; }
+  .load-val { font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; line-height: 1.15; }
+  .load-val b { font-size: 14px; }
+  .load-val span { display: block; font-size: 10.5px; color: var(--ink-muted); }
+  .load-val.bad b { color: var(--bad); }
+  .load-val.warn b { color: var(--warn); }
+  .load-val.good b { color: var(--good); }
+  .load-down { font-size: 11.5px; font-weight: 650; color: var(--bad); }
+
+  .summary { border-left: 3px solid var(--good); }
+  .summary.warn { border-left-color: var(--warn); }
+  .summary.bad { border-left-color: var(--bad); }
+  .summary ul { margin: 0; padding: 0 0 0 18px; }
+  .summary li { margin: 7px 0; font-size: 13px; color: var(--ink-2); }
+  .summary li b { color: var(--ink); }
+  .summary .lead { font-size: 14px; font-weight: 650; margin: 0 0 6px; }
+  .summary .lead.good { color: var(--good); }
+  .summary .lead.warn { color: var(--warn); }
+  .summary .lead.bad { color: var(--bad); }
+
+  .table-wrap { overflow-x: auto; }
+  table.plan-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  table.plan-table th, table.plan-table td {
+    padding: 7px 9px; border-bottom: 1px solid var(--grid); text-align: right;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  table.plan-table th { color: var(--ink-muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; }
+  table.plan-table th:first-child, table.plan-table td:first-child { text-align: left; font-variant-numeric: initial; }
+  table.plan-table td.name { font-weight: 600; color: var(--ink); }
+  table.plan-table tr:last-child td { border-bottom: none; }
+  table.plan-table tr.total td { font-weight: 650; border-top: 2px solid var(--border); }
+  table.plan-table input[type=number] {
+    width: 82px; font: inherit; font-size: 13px; padding: 4px 7px; text-align: right;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  table.plan-table select {
+    font: inherit; font-size: 12.5px; padding: 4px 7px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--surface); color: var(--ink); max-width: 190px;
+  }
+  table.plan-table tr.flash td { background: var(--warn-wash); transition: background .6s; }
+  .pill { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 100px; }
+  .pill.good { color: var(--good); background: var(--good-wash); }
+  .pill.bad { color: var(--bad); background: var(--bad-wash); }
+  .pill.warn { color: var(--warn); background: var(--warn-wash); }
+
+  .csv-btn {
+    font: inherit; font-size: 12px; font-weight: 600; padding: 6px 11px;
+    border: 1px solid var(--border); border-radius: 7px; background: var(--surface);
+    color: var(--ink-2); cursor: pointer;
+  }
+  .csv-btn:hover { background: var(--surface-2); }
+
+  footer.foot { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 16px; color: var(--ink-muted); font-size: 12px; line-height: 1.6; }
+  footer.foot b { color: var(--ink-2); }
+
+  @media (max-width: 920px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+    .deep-link { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="dash">
+  <header class="top">
+    <div class="crumb">Демо · недельный план производства</div>
+    <h1>План производства на неделю</h1>
+    <div class="sub">План на неделю с понедельника 18 мая по воскресенье 24 мая 2026 (пример пика) · 4 линии · 6 видов · 3 смены по 8 ч</div>
+    <div class="note">Данные условные: линии, скорости, виды и объёмы — заглушки для показа логики. После знакомства с производством заменим на ваши.</div>
+  </header>
+
+  <div class="scenario-bar">
+    <button class="scenario-btn on" data-scenario="base">Базовый</button>
+    <button class="scenario-btn" data-scenario="peak">Пик +20%</button>
+    <button class="scenario-btn" data-scenario="down">Поломка линии 1</button>
+    <button class="scenario-btn" data-scenario="balance">Сбалансировать</button>
+    <button class="scenario-btn ghost" data-scenario="reset">Сбросить</button>
+    <a class="deep-link" href="deep.html" target="_blank" rel="noopener">Глубокая модель: 12 недель, склад, сырьё →</a>
+  </div>
+
+  <div class="verdict" id="verdict"></div>
+
+  <section>
+    <div class="kpi-row" id="kpis"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Календарный план по линиям</h2>
+      <div class="legend" id="ganttLegend"></div>
+    </div>
+    <div class="gantt-wrap">
+      <svg id="gantt" viewBox="0 0 1120 300" role="img" aria-label="Диаграмма Ганта на неделю"></svg>
+    </div>
+    <div class="hint">Полосы — продукция, серые блоки — переналадки. Красная зона справа — то, что не помещается в неделю. 3 смены по 8 ч: 00–08, 08–16, 16–24 (условно).</div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card summary" id="summaryCard">
+      <h2>Что это значит</h2>
+      <div id="summary"></div>
+    </div>
+    <div class="card">
+      <h2>Загрузка линий</h2>
+      <div id="load"></div>
+      <div class="legend" style="margin-top:10px">
+        <span class="legend-item"><span class="chip" style="background:var(--blue)"></span>производство</span>
+        <span class="legend-item"><span class="chip" style="background:var(--baseline)"></span>переналадка</span>
+        <span class="legend-item"><span class="chip" style="background:var(--bad)"></span>не помещается</span>
+      </div>
+      <div class="hint">Пунктир — 100% доступного времени. 168 ч = 3 смены × 8 ч × 7 дней.</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Заявка и распределение</h2>
+      <button class="csv-btn" id="csvBtn">Скачать CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table class="plan-table" id="planTable"></table>
+    </div>
+    <div class="hint">Меняйте количество или линию — план, загрузка и вывод пересчитываются сразу. Порядок видов на линии — сверху вниз по таблице. Первая наладка учитывается, если линия в начале недели была настроена на другой вид.</div>
+    <div class="hint" id="tableNote"></div>
+  </section>
+
+  <footer class="foot">
+    <b>Как читать:</b> заявка отдела продаж приходит в четверг, план уходит в пятницу утром. Этот экран — план на следующую неделю <b>с понедельника 18 мая</b> по линиям, дням и сменам.
+    <br><b>Что дальше:</b> «Глубокая модель» добавляет 12 недель, сезонность, склад, сроки хранения и сырьё. Там считается, сколько произвести; здесь — когда и на какой линии.
+    <br><b>Демо:</b> данные синтетические, не данные завода.
+  </footer>
+</div>
+
+<script>
+/* ---------- Данные демо ---------- */
+const LINES = [
+  { id: "L1", short: "Л1", name: "Линия 1 — экструзия",    hours: 168, changeover: 2.5, initial: "Эскимо" },
+  { id: "L2", short: "Л2", name: "Линия 2 — формы",        hours: 168, changeover: 2.0, initial: "Стаканчик" },
+  { id: "L3", short: "Л3", name: "Линия 3 — универсальная", hours: 168, changeover: 1.5, initial: "Ведро" },
+  { id: "L4", short: "Л4", name: "Линия 4 — итальянская",  hours: 168, changeover: 1.0, initial: "Рожок" }
+];
+
+const PRODUCTS = [
+  { id: "CUP",    name: "Пломбир в стаканчике", short: "Стаканчик", family: "Стаканчик", color: "#2a78d6", rates: { L1: 1.6, L2: 2.2, L3: 1.6, L4: 3.0 } },
+  { id: "CONE",   name: "Рожок",                short: "Рожок",     family: "Рожок",     color: "#e87ba4", rates: { L1: 1.5, L2: 0,   L3: 1.4, L4: 2.5 } },
+  { id: "ESK",    name: "Эскимо в глазури",     short: "Эскимо",    family: "Эскимо",    color: "#7a5af8", rates: { L1: 2.0, L2: 2.0, L3: 1.5, L4: 0 } },
+  { id: "BRICK",  name: "Брикет",               short: "Брикет",    family: "Брикет",    color: "#1baf7a", rates: { L1: 1.8, L2: 0,   L3: 1.6, L4: 3.0 } },
+  { id: "BUCKET", name: "Ведро 5 л",            short: "Ведро",     family: "Ведро",     color: "#eda100", rates: { L1: 0.7, L2: 0,   L3: 1.0, L4: 1.2 } },
+  { id: "P500",   name: "Пломбир 500 г",        short: "Пломбир 500", family: "Пломбир", color: "#c62828", rates: { L1: 1.8, L2: 1.8, L3: 1.5, L4: 2.8 } }
+];
+
+const BASE_DEMAND = { CUP: 320, CONE: 240, ESK: 160, BRICK: 130, BUCKET: 65, P500: 90 };
+const BASE_ASSIGN = { CUP: "L2", CONE: "L4", ESK: "L1", BRICK: "L1", BUCKET: "L3", P500: "L4" };
+
+const WEEK_HOURS = 168;
+const NEXT_WEEK_HOURS = 24;
+const TOTAL_HOURS = WEEK_HOURS + NEXT_WEEK_HOURS;
+
+const state = {
+  demand: { ...BASE_DEMAND },
+  assign: { ...BASE_ASSIGN },
+  lineDown: null,
+  highlight: new Set()
+};
+
+/* ---------- Утилиты ---------- */
+const $ = (sel) => document.querySelector(sel);
+const fmt = (n, d = 0) => Number(n).toLocaleString("ru-RU", { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct = (n) => Math.round(n * 100) + "%";
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+const productById = (id) => PRODUCTS.find(p => p.id === id);
+const lineById = (id) => LINES.find(l => l.id === id);
+
+function rate(product, lineId) {
+  return (product.rates && product.rates[lineId]) || 0;
+}
+
+/* ---------- Расчёт ---------- */
+function compute() {
+  const lines = LINES.map(line => {
+    const capacity = state.lineDown === line.id ? 0 : line.hours;
+    const items = PRODUCTS
+      .filter(p => state.assign[p.id] === line.id && Number(state.demand[p.id]) > 0)
+      .map(p => {
+        const qty = Number(state.demand[p.id]);
+        const r = rate(p, line.id);
+        return { product: p, qty, rate: r, hours: r > 0 ? qty / r : 0, compatible: r > 0 };
+      });
+
+    let t = 0;
+    let productionHours = 0;
+    let changeoverHours = 0;
+    let first = true;
+    const blocks = [];
+
+    for (const item of items) {
+      if (!item.compatible) continue;
+
+      if (first) {
+        if (line.initial !== item.product.family) {
+          blocks.push({ type: "change", start: t, end: t + line.changeover, hours: line.changeover, label: "первая наладка" });
+          t += line.changeover;
+          changeoverHours += line.changeover;
+        }
+        first = false;
+      } else {
+        blocks.push({ type: "change", start: t, end: t + line.changeover, hours: line.changeover, label: "переналадка" });
+        t += line.changeover;
+        changeoverHours += line.changeover;
+      }
+
+      blocks.push({
+        type: "product", start: t, end: t + item.hours, hours: item.hours,
+        product: item.product, qty: item.qty
+      });
+      t += item.hours;
+      productionHours += item.hours;
+    }
+
+    const rawTotal = productionHours + changeoverHours;
+    const isDown = capacity === 0;
+    const total = isDown ? 0 : rawTotal;
+    const util = capacity > 0 ? total / capacity : null;
+    const over = capacity > 0 ? Math.max(0, total - capacity) : null;
+
+    return {
+      line, capacity, items, blocks,
+      productionHours: isDown ? 0 : productionHours,
+      changeoverHours: isDown ? 0 : changeoverHours,
+      total, util, over,
+      pendingTotal: isDown ? rawTotal : 0,
+      rawProduction: productionHours,
+      rawChangeover: changeoverHours
+    };
+  });
+
+  return lines;
+}
+
+/* ---------- KPI ---------- */
+function renderKpis(lines) {
+  const totalDemand = PRODUCTS.reduce((sum, p) => sum + Number(state.demand[p.id] || 0), 0);
+  const active = lines.filter(l => l.capacity > 0);
+  const avgUtil = active.length ? active.reduce((s, l) => s + l.util, 0) / active.length : 0;
+  const maxLine = active.length ? active.reduce((a, b) => (b.util > a.util ? b : a)) : null;
+  const totalChange = lines.reduce((s, l) => s + l.changeoverHours, 0);
+  const changeShare = totalChange / ((active.length * WEEK_HOURS) || 1);
+  const downLine = state.lineDown ? lineById(state.lineDown) : null;
+  const downHours = downLine
+    ? lines.find(l => l.line.id === state.lineDown).pendingTotal
+    : 0;
+
+  const loadTone = maxLine ? (maxLine.util > 1 ? "bad" : maxLine.util >= 0.9 ? "warn" : "good") : "";
+
+  let bottleneck;
+  if (downLine) {
+    bottleneck = { label: "Узкое место", value: downLine.short, foot: `остановлена · ${fmt(downHours, 1)} ч без места`, tone: "bad" };
+  } else if (!maxLine) {
+    bottleneck = { label: "Узкое место", value: "—", foot: "нет активных линий", tone: "" };
+  } else if (maxLine.util > 1) {
+    bottleneck = { label: "Узкое место", value: maxLine.line.short, foot: `перегруз ${fmt(maxLine.over, 1)} ч`, tone: "bad" };
+  } else if (maxLine.util >= 0.9) {
+    bottleneck = { label: "Узкое место", value: maxLine.line.short, foot: `резерв ${fmt(maxLine.capacity - maxLine.total, 1)} ч`, tone: "warn" };
+  } else {
+    bottleneck = { label: "Узкое место", value: "нет", foot: `максимум ${maxLine.line.short} — ${pct(maxLine.util)}`, tone: "good" };
+  }
+
+  const tiles = [
+    {
+      label: "Заявка на неделю",
+      value: fmt(totalDemand) + " т",
+      foot: `${PRODUCTS.length} видов · ${downLine ? "линия " + downLine.short + " остановлена" : "все линии в работе"}`,
+      tone: ""
+    },
+    {
+      label: "Загрузка линий",
+      value: active.length ? pct(avgUtil) : "—",
+      foot: maxLine ? `максимум ${pct(maxLine.util)} · ${maxLine.line.short}` : "нет активных линий",
+      tone: loadTone
+    },
+    {
+      label: "Переналадки",
+      value: fmt(totalChange, 1) + " ч",
+      foot: `${pct(changeShare)} доступного времени`,
+      tone: ""
+    },
+    bottleneck
+  ];
+
+  if (downLine) {
+    tiles[1].foot = `линия ${downLine.short} остановлена · ${fmt(downHours, 1)} ч без места`;
+    tiles[1].tone = "bad";
+  }
+
+  $("#kpis").innerHTML = tiles.map(t => `
+    <div class="kpi-tile">
+      <div class="label">${t.label}</div>
+      <div class="value ${t.tone}">${t.value}</div>
+      <div class="foot">${t.foot}</div>
+    </div>
+  `).join("");
+}
+
+/* ---------- Gantt ---------- */
+function renderGantt(lines) {
+  const svg = $("#gantt");
+  const W = 1120, H = 300;
+  const left = 112, right = 20, top = 42, bottom = 18;
+  const plotW = W - left - right;
+  const rowH = (H - top - bottom) / LINES.length;
+  const x = (h) => left + (h / TOTAL_HOURS) * plotW;
+  const parts = [];
+
+  // фон следующей недели
+  parts.push(`<rect x="${x(WEEK_HOURS)}" y="${top - 12}" width="${x(TOTAL_HOURS) - x(WEEK_HOURS)}" height="${H - top + 6}" fill="var(--surface-2)" opacity=".7"/>`);
+
+  // день-сетка
+  const days = ["Пн 18", "Вт 19", "Ср 20", "Чт 21", "Пт 22", "Сб 23", "Вс 24"];
+  for (let d = 0; d <= 7; d++) {
+    const h = d * 24;
+    parts.push(`<line x1="${x(h)}" y1="${top - 8}" x2="${x(h)}" y2="${H - bottom}" stroke="var(--grid)" stroke-width="${d === 0 || d === 7 ? 1.2 : 1}"/>`);
+    if (d < 7) {
+      parts.push(`<text x="${x(h + 12)}" y="${top - 16}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink-2)">${days[d]}</text>`);
+    }
+  }
+
+  // смены внутри дней
+  for (let h = 0; h <= WEEK_HOURS; h += 8) {
+    if (h % 24 === 0) continue;
+    parts.push(`<line x1="${x(h)}" y1="${top}" x2="${x(h)}" y2="${H - bottom}" stroke="var(--grid)" stroke-width="1" stroke-dasharray="2 4" opacity=".65"/>`);
+  }
+
+  // конец недели
+  parts.push(`<line x1="${x(WEEK_HOURS)}" y1="${top - 14}" x2="${x(WEEK_HOURS)}" y2="${H - bottom}" stroke="var(--bad)" stroke-width="1.2" stroke-dasharray="5 4"/>`);
+  parts.push(`<text x="${x(WEEK_HOURS) + 4}" y="${top - 16}" font-size="10" fill="var(--bad)">конец недели</text>`);
+
+  // строки
+  lines.forEach((l, i) => {
+    const y = top + i * rowH;
+    const barY = y + 13;
+    const barH = Math.max(24, rowH - 26);
+
+    parts.push(`<text x="12" y="${y + 24}" font-size="13" font-weight="700" fill="var(--ink)">${l.line.short}</text>`);
+    parts.push(`<text x="12" y="${y + 40}" font-size="10.5" fill="var(--ink-muted)">${l.line.name.replace(/^Линия \d — /, "")}</text>`);
+    parts.push(`<line x1="${left}" y1="${y + rowH - 2}" x2="${W - right}" y2="${y + rowH - 2}" stroke="var(--grid)" stroke-width="1" opacity=".6"/>`);
+
+    if (l.capacity === 0) {
+      parts.push(`<rect x="${left}" y="${barY}" width="${plotW}" height="${barH}" rx="4" fill="var(--bad-wash)"/>`);
+      parts.push(`<text x="${left + 10}" y="${barY + barH / 2 + 4}" font-size="11" font-weight="650" fill="var(--bad)">линия остановлена — ${fmt(l.pendingTotal, 1)} ч нужно перенести</text>`);
+      return;
+    }
+
+    for (const b of l.blocks) {
+      if (b.start >= TOTAL_HOURS) continue;
+      const start = clamp(b.start, 0, TOTAL_HOURS);
+      const end = clamp(b.end, 0, TOTAL_HOURS);
+      const width = Math.max(1, x(end) - x(start));
+      const isOver = b.end > WEEK_HOURS;
+
+      if (b.type === "change") {
+        parts.push(`<rect x="${x(start)}" y="${barY}" width="${width}" height="${barH}" rx="2" fill="var(--baseline)"><title>${l.line.name}: ${b.label}, ${fmt(b.hours, 1)} ч</title></rect>`);
+        if (width > 26) {
+          parts.push(`<text x="${x(start) + width / 2}" y="${barY + barH / 2 + 4}" text-anchor="middle" font-size="9.5" fill="var(--ink-2)">пер.</text>`);
+        }
+      } else {
+        const color = isOver ? "var(--bad)" : b.product.color;
+        parts.push(`<rect x="${x(start)}" y="${barY}" width="${width}" height="${barH}" rx="2" fill="${color}"><title>${l.line.name}: ${b.product.name}, ${fmt(b.qty, 0)} т, ${fmt(b.hours, 1)} ч</title></rect>`);
+        if (width > 44) {
+          const label = width > 128 ? `${b.product.short} · ${fmt(b.hours, 0)} ч` : b.product.short;
+          const textColor = isLight(b.product.color) ? "#0b0b0b" : "#ffffff";
+          const clipId = `clip-${l.line.id}-${b.product.id}-${Math.round(b.start)}`;
+          parts.push(`<clipPath id="${clipId}"><rect x="${x(start)}" y="${barY}" width="${width}" height="${barH}" rx="2"/></clipPath>`);
+          parts.push(`<text x="${x(start) + 5}" y="${barY + barH / 2 + 4}" font-size="9.5" font-weight="600" fill="${textColor}" opacity=".95" clip-path="url(#${clipId})">${label}</text>`);
+        }
+      }
+
+      if (isOver) {
+        const overStart = Math.max(b.start, WEEK_HOURS);
+        const overEnd = Math.min(b.end, TOTAL_HOURS);
+        if (overEnd > overStart) {
+          const ow = Math.max(1, x(overEnd) - x(overStart));
+          parts.push(`<rect x="${x(overStart)}" y="${barY}" width="${ow}" height="${barH}" fill="var(--bad)" opacity=".85"><title>Не помещается в неделю: ${fmt(overEnd - overStart, 1)} ч</title></rect>`);
+        }
+      }
+    }
+
+    if (l.over > 0) {
+      parts.push(`<text x="${W - right}" y="${barY - 4}" text-anchor="end" font-size="10" font-weight="650" fill="var(--bad)">+${fmt(l.over, 1)} ч</text>`);
+    }
+  });
+
+  svg.innerHTML = parts.join("");
+}
+
+function isLight(hex) {
+  const c = hex.replace("#", "");
+  const r = parseInt(c.slice(0, 2), 16), g = parseInt(c.slice(2, 4), 16), b = parseInt(c.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 165;
+}
+
+function renderGanttLegend() {
+  const items = PRODUCTS.map(p => `<span class="legend-item"><span class="chip" style="background:${p.color}"></span>${p.short}</span>`);
+  items.push(`<span class="legend-item"><span class="chip" style="background:var(--baseline)"></span>переналадка</span>`);
+  items.push(`<span class="legend-item"><span class="chip" style="background:var(--bad)"></span>не помещается</span>`);
+  $("#ganttLegend").innerHTML = items.join("");
+}
+
+/* ---------- Загрузка ---------- */
+function renderLoad(lines) {
+  const maxScale = 1.2;
+  const html = lines.map(l => {
+    if (l.capacity === 0) {
+      return `<div class="load-row">
+        <div class="load-label"><b>${l.line.short}</b><span>${l.line.name.replace(/^Линия \d — /, "")}</span></div>
+        <div class="load-track down"></div>
+        <div class="load-val"><span class="load-down">остановлена</span><span>${fmt(l.pendingTotal, 1)} ч без места</span></div>
+      </div>`;
+    }
+
+    const prodW = clamp((l.productionHours / l.capacity) / maxScale * 100, 0, 100);
+    const changeW = clamp((l.changeoverHours / l.capacity) / maxScale * 100, 0, 100 - prodW);
+    const overW = clamp((l.over / l.capacity) / maxScale * 100, 0, 100 - prodW - changeW);
+    const tone = l.util > 1 ? "bad" : l.util >= 0.9 ? "warn" : "good";
+
+    return `<div class="load-row">
+      <div class="load-label"><b>${l.line.short}</b><span>${l.line.name.replace(/^Линия \d — /, "")}</span></div>
+      <div class="load-track ${l.util > 1 ? "over" : ""}">
+        <div class="load-fill prod" style="width:${prodW}%"></div>
+        <div class="load-fill change" style="width:${changeW}%"></div>
+        <div class="load-fill over" style="width:${overW}%"></div>
+        <div class="load-100" style="left:${100 / maxScale}%"></div>
+      </div>
+      <div class="load-val ${tone}"><b>${pct(l.util)}</b><span>${fmt(l.total, 1)} / ${fmt(l.capacity, 0)} ч</span></div>
+    </div>`;
+  }).join("");
+
+  $("#load").innerHTML = html;
+}
+
+/* ---------- Рекомендации ---------- */
+function totalOver(lines) {
+  return lines.reduce((s, l) => s + (l.capacity > 0 ? Math.max(0, l.total - l.capacity) : 0), 0);
+}
+
+function sortItems(items) {
+  const order = new Map(PRODUCTS.map((p, i) => [p.id, i]));
+  return items.slice().sort((a, b) => order.get(a.product.id) - order.get(b.product.id));
+}
+
+function countChangeovers(line, items) {
+  let changes = 0;
+  let first = true;
+  for (const item of items) {
+    if (!item.compatible) continue;
+    if (first) {
+      if (line.initial !== item.product.family) changes += line.changeover;
+      first = false;
+    } else {
+      changes += line.changeover;
+    }
+  }
+  return changes;
+}
+
+function moveResult(lines, src, dst, item) {
+  const srcItems = sortItems(src.items.filter(i => i.compatible && i.product.id !== item.product.id));
+  const dstRate = rate(item.product, dst.line.id);
+  const moved = { ...item, compatible: true, rate: dstRate, hours: item.qty / dstRate };
+  const dstItems = sortItems(dst.items.filter(i => i.compatible).concat([moved]));
+  const srcProd = srcItems.reduce((s, i) => s + i.hours, 0);
+  const dstProd = dstItems.reduce((s, i) => s + i.hours, 0);
+  const srcTotal = srcProd + countChangeovers(src.line, srcItems);
+  const dstTotal = dstProd + countChangeovers(dst.line, dstItems);
+  let newOver = 0;
+  for (const l of lines) {
+    if (l.capacity === 0) continue;
+    let t = l.total;
+    if (l.line.id === src.line.id) t = srcTotal;
+    if (l.line.id === dst.line.id) t = dstTotal;
+    newOver += Math.max(0, t - l.capacity);
+  }
+  return {
+    srcTotal, dstTotal, newOver,
+    srcUtil: src.capacity ? srcTotal / src.capacity : 0,
+    dstUtil: dst.capacity ? dstTotal / dst.capacity : 0
+  };
+}
+
+function findMoves(lines) {
+  const moves = [];
+  for (const src of lines) {
+    if (src.capacity === 0) continue;
+    for (const item of src.items) {
+      if (!item.compatible) continue;
+      for (const dst of lines) {
+        if (dst.line.id === src.line.id || dst.capacity === 0) continue;
+        if (!rate(item.product, dst.line.id)) continue;
+        moves.push({ src, dst, item, ...moveResult(lines, src, dst, item) });
+      }
+    }
+  }
+  return moves;
+}
+
+function bestMove(lines) {
+  const moves = findMoves(lines).filter(m => m.src.util >= 0.9 && m.dstUtil <= 1.0);
+  moves.sort((a, b) => Math.max(a.srcUtil, a.dstUtil) - Math.max(b.srcUtil, b.dstUtil));
+  return moves[0] || null;
+}
+
+function bestFixMove(lines) {
+  const current = totalOver(lines);
+  const moves = findMoves(lines).filter(m => m.dstUtil <= 1.0 && m.newOver < current - 1e-6);
+  moves.sort((a, b) => a.newOver - b.newOver || Math.max(a.srcUtil, a.dstUtil) - Math.max(b.srcUtil, b.dstUtil));
+  return moves[0] || null;
+}
+
+function renderSummary(lines) {
+  const active = lines.filter(l => l.capacity > 0);
+  const over = active.filter(l => l.util > 1);
+  const near = active.filter(l => l.util >= 0.9 && l.util <= 1);
+  const idle = active.filter(l => l.util < 0.5);
+  const maxLine = active.length ? active.reduce((a, b) => (b.util > a.util ? b : a)) : null;
+  const minLine = active.length ? active.reduce((a, b) => (b.util < a.util ? b : a)) : null;
+  const totalChange = lines.reduce((s, l) => s + l.changeoverHours, 0);
+  const totalProd = lines.reduce((s, l) => s + l.productionHours, 0);
+  const totalCap = active.reduce((s, l) => s + l.capacity, 0);
+  const items = [];
+  let lead = "";
+  let tone = "good";
+  let verdict = "";
+  const unassigned = PRODUCTS.filter(p => !state.assign[p.id]);
+  const incompat = PRODUCTS.filter(p => state.assign[p.id] && !rate(p, state.assign[p.id]));
+
+  if (state.lineDown) {
+    const down = lines.find(l => l.line.id === state.lineDown);
+    const moved = down.items.filter(i => i.compatible);
+    lead = `Линия ${down.line.short} остановлена`;
+    tone = "bad";
+    verdict = `Линия <b>${down.line.short}</b> остановлена: <b>${fmt(down.pendingTotal, 1)} ч</b> нужно перенести.`;
+    items.push(`<li>На линии <b>${down.line.short}</b> висело <b>${fmt(down.pendingTotal, 1)} ч</b> продукции. Её нужно перенести на другие линии или согласовать сверхурочные.</li>`);
+    if (moved.length) {
+      items.push(`<li>Что переносить: ${moved.map(i => `<b>${i.product.name}</b> — ${fmt(i.qty, 0)} т`).join(", ")}.</li>`);
+    }
+    const free = active.filter(l => l.line.id !== state.lineDown).map(l => `${l.line.short}: ${fmt(Math.max(0, l.capacity - l.total), 1)} ч`).join(", ");
+    items.push(`<li>Свободно на остальных линиях: ${free || "нет"}.</li>`);
+  } else if (over.length) {
+    lead = "План не помещается в неделю";
+    tone = "bad";
+    verdict = `План не помещается: не хватает <b>${fmt(totalOver(lines), 1)} ч</b>. Нужны сверхурочные или снизить заявку.`;
+    for (const l of over) {
+      items.push(`<li><b>${l.line.short}</b>: нужно ${fmt(l.total, 1)} ч, доступно ${fmt(l.capacity, 0)} ч — перегруз <b>${fmt(l.over, 1)} ч</b>.</li>`);
+    }
+    const currentOver = totalOver(lines);
+    const fix = bestFixMove(lines);
+    if (fix) {
+      items.push(`<li>Перенос <b>${fix.item.product.name}</b> с <b>${fix.src.line.short}</b> на <b>${fix.dst.line.short}</b> снижает перегруз с <b>${fmt(currentOver, 1)} ч</b> до <b>${fmt(fix.newOver, 1)} ч. Загрузка ${fix.src.line.short}: ${pct(fix.srcUtil)}, ${fix.dst.line.short}: ${pct(fix.dstUtil)}.</li>`);
+      if (fix.newOver > 0.05) {
+        items.push(`<li>Остаток перегруза <b>${fmt(fix.newOver, 1)} ч</b> — сверхурочные или снизить заявку.</li>`);
+      }
+    } else {
+      items.push(`<li>Одним переносом перегруз не снять. Нужно <b>${fmt(currentOver, 1)} ч</b> сверхурочных или снизить заявку.</li>`);
+    }
+  } else if (near.length) {
+    lead = "План выполним, но есть линия на пределе";
+    tone = "warn";
+    for (const l of near) {
+      items.push(`<li><b>${l.line.short}</b> загружена на <b>${pct(l.util)}</b>, резерв ${fmt(l.capacity - l.total, 1)} ч. Любая задержка переналадки или поломка сорвёт план.</li>`);
+    }
+    const move = bestMove(lines);
+    verdict = `План выполним, но <b>${near[0].line.short}</b> на <b>${pct(near[0].util)}</b>.`
+      + (move ? ` Перенести <b>${move.item.product.name}</b> на <b>${move.dst.line.short}</b> → ${pct(move.srcUtil)} и ${pct(move.dstUtil)}.` : "");
+    if (move) {
+      items.push(`<li>Можно подстраховаться: перенести <b>${move.item.product.name}</b> с <b>${move.src.line.short}</b> на <b>${move.dst.line.short}</b> — загрузка станет ${pct(move.srcUtil)} и ${pct(move.dstUtil)}.</li>`);
+    }
+  } else {
+    lead = "План выполним, перегруза нет";
+    tone = "good";
+    verdict = `План выполним, перегруза нет. Максимум — <b>${maxLine ? maxLine.line.short : "—"}</b> ${maxLine ? pct(maxLine.util) : ""}.`;
+    items.push(`<li>Все линии укладываются в 168 ч, перегруза нет.</li>`);
+  }
+
+  if (idle.length && !state.lineDown) {
+    for (const l of idle) {
+      items.push(`<li><b>${l.line.short}</b> недогружена: <b>${pct(l.util)}</b>, свободно ${fmt(l.capacity - l.total, 1)} ч. Можно перенести часть продукции, чтобы снизить риск на других линиях.</li>`);
+    }
+  }
+
+  if (maxLine && minLine && maxLine.line.id !== minLine.line.id) {
+    items.push(`<li>Разброс загрузки: ${pct(minLine.util)}–${pct(maxLine.util)}. Средняя — ${pct(active.reduce((s, l) => s + l.util, 0) / active.length)}.</li>`);
+  }
+
+  items.push(`<li>Переналадки: <b>${fmt(totalChange, 1)} ч</b> (${pct(totalChange / (totalCap || 1))} доступного времени). Производство: ${fmt(totalProd, 1)} ч.</li>`);
+
+  if (incompat.length) {
+    items.push(`<li style="color:var(--bad)">Несовместимые назначения: ${incompat.map(p => `<b>${p.name}</b> на ${state.assign[p.id]}`).join(", ")}. Выберите другую линию.</li>`);
+  }
+
+  if (unassigned.length) {
+    const tons = unassigned.reduce((s, p) => s + Number(state.demand[p.id] || 0), 0);
+    items.push(`<li style="color:var(--bad)">Не распределено: ${unassigned.map(p => `<b>${p.name}</b>`).join(", ")} — ${fmt(tons)} т. Назначьте линию.</li>`);
+  }
+
+  if (unassigned.length || incompat.length) {
+    const tons = unassigned.concat(incompat).reduce((s, p) => s + Number(state.demand[p.id] || 0), 0);
+    verdict += ` Не распределено: <b>${fmt(tons)} т</b>.`;
+    lead = "План неполный: есть нераспределённые виды";
+    tone = "bad";
+  }
+
+  const card = $("#summaryCard");
+  card.className = "card summary " + (tone === "bad" ? "bad" : tone === "warn" ? "warn" : "");
+  $("#summary").innerHTML = `<p class="lead ${tone}">${lead}</p><ul>${items.join("")}</ul>`;
+
+  const v = $("#verdict");
+  if (v) {
+    v.className = "verdict " + (tone === "bad" ? "bad" : tone === "warn" ? "warn" : "");
+    v.innerHTML = verdict;
+  }
+}
+
+/* ---------- Таблица ---------- */
+function renderTable(lines) {
+  const rows = PRODUCTS.map(p => {
+    const assigned = state.assign[p.id] || "";
+    const r = assigned ? rate(p, assigned) : 0;
+    const qty = Number(state.demand[p.id] || 0);
+    const hours = r > 0 ? qty / r : 0;
+    const down = assigned && state.lineDown === assigned;
+    let status = `<span class="pill good">ок</span>`;
+    if (!assigned) status = `<span class="pill warn">не назначено</span>`;
+    else if (!r) status = `<span class="pill bad">несовместимо</span>`;
+    else if (down) status = `<span class="pill bad">линия остановлена</span>`;
+
+    const options = [`<option value="">— не назначено —</option>`]
+      .concat(LINES.map(l => {
+        const compatible = rate(p, l.id) > 0;
+        const selected = assigned === l.id ? " selected" : "";
+        const disabled = compatible ? "" : " disabled";
+        const label = `${l.short}${compatible ? "" : " — не умеет"}`;
+        return `<option value="${l.id}"${selected}${disabled} title="${l.name}">${label}</option>`;
+      })).join("");
+
+    const flash = state.highlight.has(p.id) ? " class=\"flash\"" : "";
+    return `<tr${flash}>
+      <td class="name">${p.name}</td>
+      <td><input type="number" min="0" step="1" value="${qty}" data-qty="${p.id}" aria-label="Заявка в тоннах: ${p.name}"></td>
+      <td><select data-assign="${p.id}" aria-label="Линия для вида: ${p.name}">${options}</select></td>
+      <td>${r ? fmt(r, 1) : "—"}</td>
+      <td>${r ? fmt(hours, 1) : "—"}</td>
+      <td>${status}</td>
+    </tr>`;
+  }).join("");
+
+  const totalDemand = PRODUCTS.reduce((s, p) => s + Number(state.demand[p.id] || 0), 0);
+  const totalProd = lines.reduce((s, l) => s + l.productionHours, 0);
+  const totalChange = lines.reduce((s, l) => s + l.changeoverHours, 0);
+
+  $("#planTable").innerHTML = `
+    <thead><tr>
+      <th>Вид продукции</th><th>Заявка, т</th><th>Линия</th><th>Скорость, т/ч</th><th>Часы</th><th>Статус</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr class="total">
+      <td>Итого</td><td>${fmt(totalDemand)}</td><td></td><td></td><td>${fmt(totalProd + totalChange, 1)}</td><td>${fmt(totalProd, 1)} ч пр. + ${fmt(totalChange, 1)} ч пер.</td>
+    </tr></tfoot>`;
+
+  const note = $("#tableNote");
+  if (note) {
+    if (state.lineDown) {
+      const down = lines.find(l => l.line.id === state.lineDown);
+      note.innerHTML = `Линия ${down.line.short} остановлена: ${fmt(down.pendingTotal, 1)} ч без места.`;
+      note.style.color = "var(--bad)";
+    } else {
+      note.textContent = "";
+    }
+  }
+
+  $("#planTable").querySelectorAll("input[data-qty]").forEach(inp => {
+    inp.addEventListener("change", (e) => {
+      const id = e.target.dataset.qty;
+      state.demand[id] = Math.max(0, Number(e.target.value) || 0);
+      state.highlight.clear();
+      setActiveScenario("");
+      renderAll();
+    });
+  });
+
+  $("#planTable").querySelectorAll("select[data-assign]").forEach(sel => {
+    sel.addEventListener("change", (e) => {
+      const id = e.target.dataset.assign;
+      state.assign[id] = e.target.value || null;
+      state.highlight.clear();
+      setActiveScenario("");
+      renderAll();
+    });
+  });
+}
+
+/* ---------- Сценарии ---------- */
+function resetState() {
+  state.demand = { ...BASE_DEMAND };
+  state.assign = { ...BASE_ASSIGN };
+  state.lineDown = null;
+  state.highlight.clear();
+}
+
+function applyPeak() {
+  resetState();
+  for (const p of PRODUCTS) state.demand[p.id] = Math.round(BASE_DEMAND[p.id] * 1.2);
+}
+
+function applyDown() {
+  resetState();
+  state.lineDown = "L1";
+}
+
+function applyBalance() {
+  resetState();
+  for (let step = 0; step < 3; step++) {
+    const lines = compute();
+    const move = bestMove(lines);
+    if (!move) break;
+    if (move.dstUtil > 1.0) break;
+    state.assign[move.item.product.id] = move.dst.line.id;
+    state.highlight.add(move.item.product.id);
+  }
+  renderAll();
+}
+
+function setActiveScenario(name) {
+  document.querySelectorAll(".scenario-btn").forEach(b => {
+    b.classList.toggle("on", b.dataset.scenario === name);
+  });
+}
+
+/* ---------- CSV ---------- */
+function downloadCsv() {
+  const lines = compute();
+  const num = (n, d = 1) => Number(n).toFixed(d).replace(".", ",");
+  const rows = [["Вид продукции", "Заявка, т", "Линия", "Скорость, т/ч", "Часы", "Статус"]];
+  for (const p of PRODUCTS) {
+    const assigned = state.assign[p.id] || "";
+    const r = assigned ? rate(p, assigned) : 0;
+    const qty = Number(state.demand[p.id] || 0);
+    rows.push([
+      p.name,
+      qty,
+      assigned ? lineById(assigned).name : "не назначено",
+      r ? num(r) : "",
+      r ? num(qty / r) : "",
+      !assigned ? "не назначено" : !r ? "несовместимо" : state.lineDown === assigned ? "линия остановлена" : "ок"
+    ]);
+  }
+  rows.push([]);
+  rows.push(["Линия", "Производство, ч", "Переналадки, ч", "Итого, ч", "Доступно, ч", "Загрузка"]);
+  for (const l of lines) {
+    rows.push([
+      l.line.name,
+      num(l.productionHours),
+      num(l.changeoverHours),
+      num(l.total),
+      l.capacity.toFixed(0),
+      l.capacity ? Math.round(l.util * 100) + "%" : "остановлена"
+    ]);
+  }
+  const csv = "\ufeff" + rows.map(r => r.join(";")).join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "plan_week_2026-05-18.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------- Рендер ---------- */
+function renderAll() {
+  const lines = compute();
+  renderKpis(lines);
+  renderGantt(lines);
+  renderLoad(lines);
+  renderSummary(lines);
+  renderTable(lines);
+}
+
+/* ---------- Старт ---------- */
+renderGanttLegend();
+renderAll();
+
+document.querySelectorAll(".scenario-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const name = btn.dataset.scenario;
+    setActiveScenario(name === "reset" ? "base" : name);
+    if (name === "base" || name === "reset") { resetState(); renderAll(); }
+    if (name === "peak") { applyPeak(); renderAll(); }
+    if (name === "down") { applyDown(); renderAll(); }
+    if (name === "balance") { applyBalance(); }
+  });
+});
+
+$("#csvBtn").addEventListener("click", downloadCsv);
+</script>
+</body>
+</html>

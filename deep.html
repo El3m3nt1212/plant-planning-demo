@@ -1,0 +1,1318 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<style>#whatifSection{display:none!important}</style>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Демо: глубокая модель планирования</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --surface-2: #f2f1ec;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --ink-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --good: #0ca30c;
+    --good-wash: rgba(12,163,12,0.10);
+    --bad: #c62828;
+    --bad-wash: rgba(198,40,40,0.10);
+    --warn: #b26a00;
+    --warn-wash: rgba(250,178,25,0.18);
+    --blue: #2a78d6;
+    --green: #008300;
+    --pink: #e87ba4;
+    --amber: #eda100;
+    --teal: #1baf7a;
+    --violet: #7a5af8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --surface-2: #232322;
+      --ink: #ffffff;
+      --ink-2: #c3c2b7;
+      --ink-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255,255,255,0.10);
+      --good: #4ade4a;
+      --good-wash: rgba(74,222,74,0.14);
+      --bad: #ff6b6b;
+      --bad-wash: rgba(255,107,107,0.14);
+      --warn: #f5b74a;
+      --warn-wash: rgba(245,183,74,0.16);
+      --blue: #3987e5;
+      --green: #4ade4a;
+      --pink: #d55181;
+      --amber: #c98500;
+      --teal: #199e70;
+      --violet: #9b87ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.45;
+  }
+  .dash { max-width: 1180px; margin: 0 auto; padding: 28px 20px 64px; }
+
+  header.top { display: flex; flex-direction: column; gap: 4px; margin-bottom: 20px; }
+  header.top h1 { font-size: 24px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+  header.top .sub { color: var(--ink-2); font-size: 14px; }
+  header.top .note { color: var(--ink-muted); font-size: 12.5px; margin-top: 6px; }
+
+  .scenario-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
+  .scenario-btn {
+    font: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+    color: var(--ink-2); cursor: pointer;
+  }
+  .scenario-btn:hover { background: var(--surface-2); }
+  .scenario-btn.on { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+
+  .whatif {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 26px;
+  }
+  .whatif-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .whatif-head h3 { font-size: 15px; margin: 0; font-weight: 650; }
+  .whatif-note { font-size: 12px; color: var(--ink-muted); text-align: right; }
+  .whatif-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 14px; align-items: end; }
+  .whatif-control { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-2); }
+  .whatif-control span { display: flex; justify-content: space-between; gap: 6px; }
+  .whatif-control b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .whatif-control input[type=range] { width: 100%; accent-color: var(--blue); }
+  .whatif-control select { width: 100%; }
+  .whatif-btn {
+    font: inherit; font-size: 13px; font-weight: 650; padding: 8px 14px;
+    border: 1px solid var(--ink); border-radius: 8px; background: var(--ink);
+    color: var(--surface); cursor: pointer; height: 34px;
+  }
+  .whatif-btn:disabled { opacity: .5; cursor: default; }
+  .whatif-status { font-size: 12.5px; color: var(--ink-2); margin-top: 10px; min-height: 18px; }
+  .whatif-status.error { color: var(--bad); }
+  .whatif.disabled { opacity: .65; }
+  .whatif-overrides { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+  .whatif-overrides summary { font-size: 12.5px; color: var(--ink-2); cursor: pointer; user-select: none; }
+  .override-wrap { overflow-x: auto; margin-top: 8px; }
+  .override-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .override-table th, .override-table td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--grid); }
+  .override-table th { color: var(--ink-muted); font-weight: 600; }
+  .override-table input { width: 100px; font: inherit; font-size: 12px; padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--ink); }
+  .override-note { font-size: 11.5px; color: var(--ink-muted); margin-top: 6px; }
+  .override-subtitle { font-size: 12px; font-weight: 600; color: var(--ink-2); margin-top: 10px; }
+  .whatif-reset { font: inherit; font-size: 12px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--ink-2); cursor: pointer; margin-top: 8px; }
+  .whatif-reset:disabled { opacity: .5; cursor: default; }
+
+  h2.section-title {
+    font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--ink-muted); margin: 0 0 12px;
+  }
+  section { margin-bottom: 34px; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .kpi-tile {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 15px 17px; display: flex; flex-direction: column; gap: 5px;
+  }
+  .kpi-tile .label { font-size: 12.5px; color: var(--ink-2); }
+  .kpi-tile .value { font-size: 25px; font-weight: 650; letter-spacing: -0.01em; }
+  .kpi-tile .value.good { color: var(--good); }
+  .kpi-tile .value.bad { color: var(--bad); }
+  .kpi-tile .foot { font-size: 12px; color: var(--ink-muted); }
+
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px 12px;
+  }
+  .chart-card h3 { font-size: 15px; margin: 0; font-weight: 650; }
+  .chart-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+  .grid-3 { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 12px; align-items: start; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 2px 0 8px; }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+  .chip { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
+  .key { width: 14px; height: 2px; border-radius: 2px; display: inline-block; flex: none; }
+
+  .gantt { display: grid; grid-template-columns: 54px repeat(12, minmax(0, 1fr)); gap: 4px; }
+  .gantt-head { display: contents; }
+  .gantt-week { font-size: 10.5px; color: var(--ink-muted); text-align: center; line-height: 1.2; padding-bottom: 2px; }
+  .gantt-week span { display: block; font-size: 9.5px; }
+  .gantt-row { display: contents; }
+  .gantt-label { font-size: 12px; font-weight: 650; color: var(--ink-2); display: flex; align-items: center; }
+  .gantt-cell {
+    position: relative; height: 30px; background: var(--surface-2); border-radius: 4px;
+    overflow: hidden; border: 1px solid transparent;
+  }
+  .gantt-cell.over { border-color: var(--bad); }
+  .gantt-bar { display: flex; height: 100%; }
+  .gantt-seg { height: 100%; min-width: 1px; }
+  .gantt-seg.change { background: var(--baseline); }
+  .gantt-h {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 9.5px; font-weight: 650; color: var(--ink); text-shadow: 0 0 3px var(--surface);
+    pointer-events: none;
+  }
+  .gantt-cell.over .gantt-h { color: var(--bad); }
+
+  .chart-wrap { position: relative; }
+  .chart-wrap svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .tooltip {
+    position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    opacity: 0; transition: opacity .08s; z-index: 5; min-width: 150px; white-space: pre-line;
+  }
+  .tooltip .t-title { font-weight: 650; margin-bottom: 4px; color: var(--ink); }
+
+  details.table-toggle { margin-top: 8px; }
+  details.table-toggle summary { font-size: 12.5px; color: var(--ink-2); cursor: pointer; user-select: none; }
+  .data-table-wrap { overflow-x: auto; margin-top: 8px; }
+  table.data-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  table.data-table th, table.data-table td { text-align: right; padding: 5px 9px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.data-table th:first-child, table.data-table td:first-child { text-align: left; font-variant-numeric: initial; }
+  table.data-table th { color: var(--ink-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+  table.data-table td { border-bottom: 1px solid var(--grid); color: var(--ink-2); }
+  table.data-table tr:last-child td { border-bottom: none; }
+
+  select {
+    font: inherit; font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--border);
+    border-radius: 7px; background: var(--surface); color: var(--ink);
+  }
+
+  .pill { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 100px; }
+  .pill.good { color: var(--good); background: var(--good-wash); }
+  .pill.bad { color: var(--bad); background: var(--bad-wash); }
+  .pill.warn { color: var(--warn); background: var(--warn-wash); }
+
+  .cost-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .cost-table td { padding: 6px 8px; border-bottom: 1px solid var(--grid); }
+  .cost-table td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .cost-table tr:last-child td { border-bottom: none; font-weight: 650; }
+  .cost-bar { display: flex; height: 14px; border-radius: 4px; overflow: hidden; margin-bottom: 12px; background: var(--surface-2); }
+  .cost-bar div { height: 100%; }
+  .cost-note { margin-top: 12px; padding: 10px 12px; background: var(--surface-2); border-radius: 8px; font-size: 12.5px; color: var(--ink-2); }
+
+  footer.foot { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 16px; color: var(--ink-muted); font-size: 12px; line-height: 1.6; }
+
+  .axis-line { stroke: var(--grid); stroke-width: 1; }
+  .axis-text { fill: var(--ink-muted); font-size: 11px; }
+  .axis-title { fill: var(--ink-muted); font-size: 11px; }
+  .grid-line { stroke: var(--grid); stroke-width: 1; stroke-dasharray: 2 3; }
+  .capacity-line { stroke: var(--bad); stroke-width: 1.2; stroke-dasharray: 5 4; }
+  .series-line { fill: none; stroke-width: 2; }
+  .series-area { opacity: 0.12; }
+
+  @media (max-width: 920px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .gantt { grid-template-columns: 44px repeat(12, minmax(34px, 1fr)); overflow-x: auto; }
+    .whatif-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="dash">
+  <div style="background:var(--warn-wash);border:1px solid var(--warn);border-radius:8px;padding:8px 12px;font-size:12.5px;color:var(--warn);margin-bottom:14px;">Демо на синтетических данных. Не данные завода и не коммерческое предложение.</div>
+  <header class="top">
+    <h1>Глубокая модель планирования</h1>
+    <div class="sub">Демо · 12 SKU · 4 линии · 12 недель · сезонность, склад, сырьё</div>
+    <div class="note">Глубокая модель: 12 недель, 12 SKU, 4 линии — демо-заглушки. Недельный план — на отдельном экране, ближе к вашему ритму.</div>
+    <div class="note" id="note"></div>
+    <div style="margin-top:8px"><a href="index.html" style="font-size:12.5px;color:var(--blue);text-decoration:none">← Недельный план</a></div>
+  </header>
+
+  <div class="scenario-bar" id="scenarioBar"></div>
+
+  <section class="whatif" id="whatifSection">
+    <div class="whatif-head">
+      <h3>Свой сценарий</h3>
+      <span class="whatif-note" id="whatifNote">Проверяю API…</span>
+    </div>
+    <div class="whatif-grid">
+      <label class="whatif-control">
+        <span>Спрос <b id="demandMultVal">1,00</b></span>
+        <input type="range" id="demandMult" min="0.6" max="1.5" step="0.05" value="1">
+      </label>
+      <label class="whatif-control">
+        <span>Молоко <b id="supplyMilkVal">1,00</b></span>
+        <input type="range" id="supplyMilk" min="0.5" max="1.2" step="0.05" value="1">
+      </label>
+      <label class="whatif-control">
+        <span>Сливки <b id="supplyCreamVal">1,00</b></span>
+        <input type="range" id="supplyCream" min="0.5" max="1.2" step="0.05" value="1">
+      </label>
+      <label class="whatif-control">
+        <span>Сахар <b id="supplySugarVal">1,00</b></span>
+        <input type="range" id="supplySugar" min="0.5" max="1.2" step="0.05" value="1">
+      </label>
+      <label class="whatif-control">
+        <span>Какао <b id="supplyCocoaVal">1,00</b></span>
+        <input type="range" id="supplyCocoa" min="0.5" max="1.2" step="0.05" value="1">
+      </label>
+      <label class="whatif-control">
+        <span>Упаковка <b id="supplyPackagingVal">1,00</b></span>
+        <input type="range" id="supplyPackaging" min="0.5" max="1.2" step="0.05" value="1">
+      </label>
+      <label class="whatif-control">
+        <span>Срок хранения × <b id="shelfMultVal">1,00</b></span>
+        <input type="range" id="shelfMult" min="0.5" max="1.5" step="0.05" value="1">
+      </label>
+      <label class="whatif-control">
+        <span>Безопасный запас × <b id="safetyMultVal">1,00</b></span>
+        <input type="range" id="safetyMult" min="0.5" max="1.5" step="0.05" value="1">
+      </label>
+      <label class="whatif-control">
+        <span>Лимит переработки × <b id="overtimeMultVal">1,00</b></span>
+        <input type="range" id="overtimeMult" min="0.5" max="1.5" step="0.05" value="1">
+      </label>
+      <label class="whatif-control">
+        <span>Выключить линию</span>
+        <select id="lineDown">
+          <option value="">все работают</option>
+          <option value="L1">L1</option>
+          <option value="L2">L2</option>
+          <option value="L3">L3</option>
+          <option value="L4">L4</option>
+        </select>
+      </label>
+      <button class="whatif-btn" id="solveBtn">Пересчитать</button>
+    </div>
+    <details class="whatif-overrides">
+      <summary>Точечные переопределения (SKU и линии)</summary>
+      <div class="override-wrap" id="skuOverrides"></div>
+      <div class="override-subtitle">Лимит переработки по линиям, ч/нед</div>
+      <div class="override-wrap" id="lineOverrides"></div>
+      <div class="override-subtitle">Часы смен по линиям, ч/нед</div>
+      <div class="override-wrap" id="lineHoursOverrides"></div>
+      <div class="override-note">Пусто — базовое значение или глобальный множитель. Значения — абсолютные.</div>
+      <button class="whatif-reset" id="resetOverrides" type="button">Сбросить переопределения</button>
+    </details>
+    <div class="whatif-status" id="whatifStatus"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Итоги</h2>
+    <div class="kpi-row" id="kpis"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title">План по линиям</h2>
+    <div class="chart-card">
+      <div class="chart-head">
+        <h3>Недельная загрузка линий</h3>
+        <div class="legend" id="familyLegend"></div>
+      </div>
+      <div class="gantt" id="gantt"></div>
+      <details class="table-toggle">
+        <summary>Показать таблицей</summary>
+        <div class="data-table-wrap" id="ganttTable"></div>
+      </details>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Загрузка и переработка</h2>
+    <div class="chart-card">
+      <div class="chart-head"><h3>Часы по неделям</h3></div>
+      <div class="legend" id="loadLegend"></div>
+      <div class="chart-wrap" id="loadWrap">
+        <svg id="loadSvg" viewBox="0 0 900 320"></svg>
+        <div class="tooltip" id="loadTip"></div>
+      </div>
+      <details class="table-toggle">
+        <summary>Показать таблицей</summary>
+        <div class="data-table-wrap" id="loadTable"></div>
+      </details>
+    </div>
+    <div class="chart-card" style="margin-top:12px">
+      <div class="chart-head"><h3>По линиям</h3></div>
+      <div id="lineSummary"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Склад и сырьё</h2>
+    <div class="chart-card">
+      <div class="chart-head">
+        <h3>Склад SKU</h3>
+        <select id="skuSelect"></select>
+      </div>
+      <div class="legend" id="invLegend"></div>
+      <div class="chart-wrap" id="invWrap">
+        <svg id="invSvg" viewBox="0 0 900 280"></svg>
+        <div class="tooltip" id="invTip"></div>
+      </div>
+      <details class="table-toggle">
+        <summary>Показать таблицей</summary>
+        <div class="data-table-wrap" id="invTable"></div>
+      </details>
+    </div>
+    <div class="chart-card" style="margin-top:12px">
+      <div class="chart-head">
+        <h3>Сырьё</h3>
+        <select id="matSelect"></select>
+      </div>
+      <div class="legend" id="matLegend"></div>
+      <div class="chart-wrap" id="matWrap">
+        <svg id="matSvg" viewBox="0 0 900 280"></svg>
+        <div class="tooltip" id="matTip"></div>
+      </div>
+      <details class="table-toggle">
+        <summary>Показать таблицей</summary>
+        <div class="data-table-wrap" id="matTable"></div>
+      </details>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Сезонность</h2>
+    <div class="grid-2">
+      <div class="chart-card">
+        <div class="chart-head"><h3>История и прогноз</h3></div>
+        <div class="legend" id="seasonLegend"></div>
+        <div class="chart-wrap" id="seasonWrap">
+          <svg id="seasonSvg" viewBox="0 0 900 280"></svg>
+          <div class="tooltip" id="seasonTip"></div>
+        </div>
+        <details class="table-toggle">
+          <summary>Показать таблицей</summary>
+          <div class="data-table-wrap" id="seasonTable"></div>
+        </details>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head"><h3>Сезонный индекс</h3></div>
+        <div class="chart-wrap" id="indexWrap">
+          <svg id="indexSvg" viewBox="0 0 900 280"></svg>
+          <div class="tooltip" id="indexTip"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Затраты</h2>
+    <div class="chart-card">
+      <div id="costs"></div>
+    </div>
+  </section>
+
+  <footer class="foot" id="foot"></footer>
+</div>
+
+<script>
+const DATA = {"meta": {"built_at": "2026-11-13 23:54", "sku_count": 12, "line_count": 4, "weeks": 12, "demo": true}, "skus": [{"id": "P500", "name": "Пломбир 500 г", "family": "Пломбир", "shelf": 12, "safety": 22500, "price": 60.0, "holding": 0.6}, {"id": "P1000", "name": "Пломбир 1 кг", "family": "Пломбир", "shelf": 12, "safety": 10000, "price": 120.0, "holding": 1.2}, {"id": "P5L", "name": "Пломбир 5 л", "family": "Пломбир", "shelf": 16, "safety": 1500, "price": 450.0, "holding": 5.0}, {"id": "E_CHOC", "name": "Эскимо шоколадное", "family": "Эскимо", "shelf": 16, "safety": 15000, "price": 45.0, "holding": 0.45}, {"id": "E_VAN", "name": "Эскимо ванильное", "family": "Эскимо", "shelf": 16, "safety": 7500, "price": 40.0, "holding": 0.4}, {"id": "C_VAN", "name": "Стаканчик ванильный", "family": "Стаканчик", "shelf": 12, "safety": 25000, "price": 35.0, "holding": 0.35}, {"id": "C_CHOC", "name": "Стаканчик шоколадный", "family": "Стаканчик", "shelf": 12, "safety": 17500, "price": 38.0, "holding": 0.38}, {"id": "C_CREME", "name": "Стаканчик крем-брюле", "family": "Стаканчик", "shelf": 12, "safety": 10000, "price": 40.0, "holding": 0.4}, {"id": "B_CREME", "name": "Брикет крем-брюле", "family": "Брикет", "shelf": 12, "safety": 12500, "price": 42.0, "holding": 0.42}, {"id": "B_PLOM", "name": "Брикет пломбир", "family": "Брикет", "shelf": 12, "safety": 9000, "price": 40.0, "holding": 0.4}, {"id": "V5_PLOM", "name": "Ведро 5 л пломбир", "family": "Ведро", "shelf": 16, "safety": 1250, "price": 500.0, "holding": 5.0}, {"id": "V5_CHOC", "name": "Ведро 5 л шоколадное", "family": "Ведро", "shelf": 16, "safety": 750, "price": 520.0, "holding": 5.2}], "lines": [{"id": "L1", "name": "Линия 1 — экструзия", "hours": 120.0, "overtime_max": 20.0, "overtime_cost": 1500.0}, {"id": "L2", "name": "Линия 2 — формы", "hours": 120.0, "overtime_max": 20.0, "overtime_cost": 1500.0}, {"id": "L3", "name": "Линия 3 — универсальная", "hours": 120.0, "overtime_max": 20.0, "overtime_cost": 1200.0}, {"id": "L4", "name": "Линия 4 — новая итальянская", "hours": 168.0, "overtime_max": 24.0, "overtime_cost": 1800.0}], "materials": [{"id": "milk", "name": "Молоко", "unit": "л", "price": 60.0}, {"id": "cream", "name": "Сливки", "unit": "кг", "price": 300.0}, {"id": "sugar", "name": "Сахар", "unit": "кг", "price": 70.0}, {"id": "cocoa", "name": "Какао", "unit": "кг", "price": 500.0}, {"id": "packaging", "name": "Упаковка", "unit": "шт", "price": 3.0}], "families": ["Брикет", "Ведро", "Пломбир", "Стаканчик", "Эскимо"], "weeks": [{"week": 1, "week_start": "2026-05-04", "month": "2026-05", "demand": 307834}, {"week": 2, "week_start": "2026-05-11", "month": "2026-05", "demand": 307834}, {"week": 3, "week_start": "2026-05-18", "month": "2026-05", "demand": 307834}, {"week": 4, "week_start": "2026-05-25", "month": "2026-05", "demand": 307834}, {"week": 5, "week_start": "2026-06-01", "month": "2026-06", "demand": 372717}, {"week": 6, "week_start": "2026-06-08", "month": "2026-06", "demand": 372717}, {"week": 7, "week_start": "2026-06-15", "month": "2026-06", "demand": 372717}, {"week": 8, "week_start": "2026-06-22", "month": "2026-06", "demand": 372717}, {"week": 9, "week_start": "2026-06-29", "month": "2026-06", "demand": 372717}, {"week": 10, "week_start": "2026-07-06", "month": "2026-07", "demand": 436544}, {"week": 11, "week_start": "2026-07-13", "month": "2026-07", "demand": 436544}, {"week": 12, "week_start": "2026-07-20", "month": "2026-07", "demand": 436544}], "history": [{"month": "2024-01", "demand": 657627}, {"month": "2024-02", "demand": 750032}, {"month": "2024-03", "demand": 833856}, {"month": "2024-04", "demand": 1006688}, {"month": "2024-05", "demand": 1264850}, {"month": "2024-06", "demand": 1542332}, {"month": "2024-07", "demand": 1780882}, {"month": "2024-08", "demand": 1602481}, {"month": "2024-09", "demand": 1191595}, {"month": "2024-10", "demand": 985872}, {"month": "2024-11", "demand": 794582}, {"month": "2024-12", "demand": 726045}, {"month": "2025-01", "demand": 657030}, {"month": "2025-02", "demand": 751260}, {"month": "2025-03", "demand": 862768}, {"month": "2025-04", "demand": 1040982}, {"month": "2025-05", "demand": 1351395}, {"month": "2025-06", "demand": 1612320}, {"month": "2025-07", "demand": 1937604}, {"month": "2025-08", "demand": 1729267}, {"month": "2025-09", "demand": 1311332}, {"month": "2025-10", "demand": 966727}, {"month": "2025-11", "demand": 801492}, {"month": "2025-12", "demand": 784696}], "seasonality": [{"month": 1, "index": 0.598}, {"month": 2, "index": 0.659}, {"month": 3, "index": 0.765}, {"month": 4, "index": 0.931}, {"month": 5, "index": 1.152}, {"month": 6, "index": 1.41}, {"month": 7, "index": 1.631}, {"month": 8, "index": 1.479}, {"month": 9, "index": 1.105}, {"month": 10, "index": 0.882}, {"month": 11, "index": 0.716}, {"month": 12, "index": 0.672}], "scenarios": {"base": {"id": "base", "name": "Базовый", "demand_mult": 1.0, "line_down": null, "plan": {"scenario": {"id": "base", "name": "Базовый", "demand_mult": 1.0, "supply_mult": {"milk": 1.0, "cream": 1.0, "sugar": 1.0, "cocoa": 1.0, "packaging": 1.0}, "line_down": null}, "solver": {"status": 0, "message": "Optimization terminated successfully. (HiGHS Status 7: Optimal)", "objective": 348531468.87, "mip_gap": 0.00199, "mip_node_count": 704, "solve_time_s": 18.02}, "weeks": [{"week": 1, "week_start": "2026-05-04", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 99.66, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 0.8472, "items": [{"sku_id": "E_CHOC", "qty": 21175, "hours": 21.18}, {"sku_id": "E_VAN", "qty": 41550, "hours": 41.55}, {"sku_id": "C_CREME", "qty": 36938, "hours": 36.94}]}, "L3": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L4": {"active": true, "families": ["Брикет", "Ведро", "Пломбир", "Стаканчик"], "production_hours": 165.0, "changeover_hours": 3.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P500", "qty": 29147, "hours": 14.57}, {"sku_id": "P1000", "qty": 13036, "hours": 10.86}, {"sku_id": "P5L", "qty": 1912, "hours": 4.78}, {"sku_id": "C_VAN", "qty": 43858, "hours": 43.86}, {"sku_id": "C_CHOC", "qty": 25865, "hours": 27.23}, {"sku_id": "B_CREME", "qty": 48070, "hours": 30.04}, {"sku_id": "B_PLOM", "qty": 28780, "hours": 17.99}, {"sku_id": "V5_PLOM", "qty": 4342, "hours": 9.65}, {"sku_id": "V5_CHOC", "qty": 2528, "hours": 6.02}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 39501, "C_VAN": 37787, "C_CHOC": 17500, "C_CREME": 33469, "B_CREME": 42785, "B_PLOM": 27890, "V5_PLOM": 4046, "V5_CHOC": 2389}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 2169, "inventory": 0, "usage": 77479}, "cream": {"purchase": 717, "inventory": 0, "usage": 18482}, "sugar": {"purchase": 1010, "inventory": 0, "usage": 23805}, "cocoa": {"purchase": 92, "inventory": 0, "usage": 1742}, "packaging": {"purchase": 32201, "inventory": 0, "usage": 297201}}}, {"week": 2, "week_start": "2026-05-11", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Эскимо"], "production_hours": 72.35, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.6029, "items": [{"sku_id": "E_CHOC", "qty": 72349, "hours": 72.35}]}, "L3": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L4": {"active": true, "families": ["Пломбир", "Стаканчик"], "production_hours": 167.0, "changeover_hours": 1.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P500", "qty": 51647, "hours": 25.82}, {"sku_id": "P1000", "qty": 46072, "hours": 38.39}, {"sku_id": "P5L", "qty": 3412, "hours": 8.53}, {"sku_id": "C_VAN", "qty": 48606, "hours": 48.61}, {"sku_id": "C_CHOC", "qty": 43365, "hours": 45.65}]}}, "inventory": {"P500": 22500, "P1000": 33036, "P5L": 1500, "E_CHOC": 51174, "E_VAN": 22452, "C_VAN": 30321, "C_CHOC": 17500, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 80148, "inventory": 0, "usage": 80148}, "cream": {"purchase": 18703, "inventory": 0, "usage": 18703}, "sugar": {"purchase": 23904, "inventory": 0, "usage": 23904}, "cocoa": {"purchase": 2097, "inventory": 0, "usage": 2097}, "packaging": {"purchase": 265451, "inventory": 0, "usage": 265451}}}, {"week": 3, "week_start": "2026-05-18", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 118.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 1, "hours": 0.0}, {"sku_id": "E_VAN", "qty": 2097, "hours": 2.1}, {"sku_id": "C_VAN", "qty": 50750, "hours": 42.29}, {"sku_id": "C_CREME", "qty": 73611, "hours": 73.61}]}, "L3": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L4": {"active": true, "families": ["Брикет", "Ведро", "Пломбир", "Стаканчик"], "production_hours": 165.0, "changeover_hours": 3.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P500", "qty": 51647, "hours": 25.82}, {"sku_id": "P5L", "qty": 3412, "hours": 8.53}, {"sku_id": "C_CHOC", "qty": 56109, "hours": 59.06}, {"sku_id": "B_CREME", "qty": 60570, "hours": 37.86}, {"sku_id": "B_PLOM", "qty": 37780, "hours": 23.61}, {"sku_id": "V5_PLOM", "qty": 2796, "hours": 6.21}, {"sku_id": "V5_CHOC", "qty": 1639, "hours": 3.9}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 25000, "C_CHOC": 30244, "C_CREME": 60142, "B_CREME": 42785, "B_PLOM": 27890, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 75642, "inventory": 0, "usage": 75642}, "cream": {"purchase": 18303, "inventory": 0, "usage": 18303}, "sugar": {"purchase": 23714, "inventory": 0, "usage": 23714}, "cocoa": {"purchase": 1840, "inventory": 0, "usage": 1840}, "packaging": {"purchase": 340411, "inventory": 0, "usage": 340411}}}, {"week": 4, "week_start": "2026-05-25", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 118.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 36175, "hours": 36.17}, {"sku_id": "E_VAN", "qty": 37341, "hours": 37.34}, {"sku_id": "C_VAN", "qty": 53381, "hours": 44.48}]}, "L3": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L4": {"active": true, "families": ["Ведро", "Пломбир", "Стаканчик"], "production_hours": 166.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P500", "qty": 51647, "hours": 25.82}, {"sku_id": "P1000", "qty": 23036, "hours": 19.2}, {"sku_id": "P5L", "qty": 3412, "hours": 8.53}, {"sku_id": "C_VAN", "qty": 26229, "hours": 26.23}, {"sku_id": "C_CHOC", "qty": 72299, "hours": 76.1}, {"sku_id": "V5_PLOM", "qty": 2796, "hours": 6.21}, {"sku_id": "V5_CHOC", "qty": 1639, "hours": 3.9}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 27792, "C_VAN": 48539, "C_CHOC": 59178, "C_CREME": 36673, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 85679, "inventory": 0, "usage": 85679}, "cream": {"purchase": 20098, "inventory": 0, "usage": 20098}, "sugar": {"purchase": 25876, "inventory": 0, "usage": 25876}, "cocoa": {"purchase": 2136, "inventory": 0, "usage": 2136}, "packaging": {"purchase": 307956, "inventory": 0, "usage": 307956}}}, {"week": 5, "week_start": "2026-06-01", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 118.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 43918, "hours": 43.92}, {"sku_id": "C_VAN", "qty": 88898, "hours": 74.08}]}, "L3": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L4": {"active": true, "families": ["Брикет", "Ведро", "Пломбир", "Стаканчик"], "production_hours": 165.0, "changeover_hours": 3.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P500", "qty": 62732, "hours": 31.37}, {"sku_id": "P1000", "qty": 29306, "hours": 24.42}, {"sku_id": "P5L", "qty": 4483, "hours": 11.21}, {"sku_id": "C_CHOC", "qty": 27408, "hours": 28.85}, {"sku_id": "B_CREME", "qty": 64126, "hours": 40.08}, {"sku_id": "B_PLOM", "qty": 26648, "hours": 16.66}, {"sku_id": "V5_PLOM", "qty": 3273, "hours": 7.27}, {"sku_id": "V5_CHOC", "qty": 2162, "hours": 5.15}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 66935, "C_CHOC": 35922, "C_CREME": 10000, "B_CREME": 44563, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 104977, "inventory": 0, "usage": 104977}, "cream": {"purchase": 24590, "inventory": 0, "usage": 24590}, "sugar": {"purchase": 31511, "inventory": 0, "usage": 31511}, "cocoa": {"purchase": 2043, "inventory": 0, "usage": 2043}, "packaging": {"purchase": 352954, "inventory": 0, "usage": 352954}}}, {"week": 6, "week_start": "2026-06-08", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 22.21, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.1851, "items": [{"sku_id": "B_PLOM", "qty": 26648, "hours": 22.21}]}, "L2": {"active": true, "families": ["Эскимо"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 59124, "hours": 59.12}, {"sku_id": "E_VAN", "qty": 60876, "hours": 60.88}]}, "L3": {"active": true, "families": ["Стаканчик"], "production_hours": 44.46, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.3705, "items": [{"sku_id": "C_CREME", "qty": 26673, "hours": 44.46}]}, "L4": {"active": true, "families": ["Ведро", "Пломбир", "Стаканчик"], "production_hours": 168.42, "changeover_hours": 2.0, "overtime_hours": 2.42, "utilization": 1.0144, "items": [{"sku_id": "P500", "qty": 62732, "hours": 31.37}, {"sku_id": "P1000", "qty": 29306, "hours": 24.42}, {"sku_id": "P5L", "qty": 4483, "hours": 11.21}, {"sku_id": "C_VAN", "qty": 28568, "hours": 28.57}, {"sku_id": "C_CHOC", "qty": 57416, "hours": 60.44}, {"sku_id": "V5_PLOM", "qty": 3273, "hours": 7.27}, {"sku_id": "V5_CHOC", "qty": 2162, "hours": 5.15}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 30206, "E_VAN": 48084, "C_VAN": 25000, "C_CHOC": 42674, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 106047, "inventory": 0, "usage": 106047}, "cream": {"purchase": 24991, "inventory": 0, "usage": 24991}, "sugar": {"purchase": 31995, "inventory": 0, "usage": 31995}, "cocoa": {"purchase": 2632, "inventory": 23, "usage": 2609}, "packaging": {"purchase": 361262, "inventory": 0, "usage": 361262}}}, {"week": 7, "week_start": "2026-06-15", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 48.93, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.4077, "items": [{"sku_id": "B_CREME", "qty": 32063, "hours": 26.72}, {"sku_id": "B_PLOM", "qty": 26648, "hours": 22.21}]}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 118.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 72630, "hours": 72.63}, {"sku_id": "C_CREME", "qty": 45370, "hours": 45.37}]}, "L3": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L4": {"active": true, "families": ["Ведро", "Пломбир", "Стаканчик"], "production_hours": 190.0, "changeover_hours": 2.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 62732, "hours": 31.37}, {"sku_id": "P1000", "qty": 29306, "hours": 24.42}, {"sku_id": "P5L", "qty": 4483, "hours": 11.21}, {"sku_id": "C_VAN", "qty": 83753, "hours": 83.75}, {"sku_id": "C_CHOC", "qty": 25490, "hours": 26.83}, {"sku_id": "V5_PLOM", "qty": 3273, "hours": 7.27}, {"sku_id": "V5_CHOC", "qty": 2162, "hours": 5.15}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 58918, "E_VAN": 27792, "C_VAN": 38250, "C_CHOC": 17500, "C_CREME": 28697, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 108406, "inventory": 0, "usage": 108406}, "cream": {"purchase": 25674, "inventory": 0, "usage": 25674}, "sugar": {"purchase": 32944, "inventory": 0, "usage": 32944}, "cocoa": {"purchase": 2632, "inventory": 0, "usage": 2655}, "packaging": {"purchase": 387909, "inventory": 0, "usage": 387909}}}, {"week": 8, "week_start": "2026-06-22", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 48.93, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.4077, "items": [{"sku_id": "B_CREME", "qty": 32063, "hours": 26.72}, {"sku_id": "B_PLOM", "qty": 26648, "hours": 22.21}]}, "L2": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L3": {"active": true, "families": ["Стаканчик"], "production_hours": 13.29, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.1108, "items": [{"sku_id": "C_CREME", "qty": 7976, "hours": 13.29}]}, "L4": {"active": true, "families": ["Ведро", "Пломбир", "Стаканчик"], "production_hours": 190.0, "changeover_hours": 2.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 62732, "hours": 31.37}, {"sku_id": "P1000", "qty": 29306, "hours": 24.42}, {"sku_id": "P5L", "qty": 4483, "hours": 11.21}, {"sku_id": "C_VAN", "qty": 57253, "hours": 57.25}, {"sku_id": "C_CHOC", "qty": 50664, "hours": 53.33}, {"sku_id": "V5_PLOM", "qty": 3273, "hours": 7.27}, {"sku_id": "V5_CHOC", "qty": 2162, "hours": 5.15}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 25000, "C_CHOC": 17500, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 97806, "inventory": 1988, "usage": 95818}, "cream": {"purchase": 23108, "inventory": 768, "usage": 22340}, "sugar": {"purchase": 29703, "inventory": 1206, "usage": 28497}, "cocoa": {"purchase": 2410, "inventory": 1017, "usage": 1393}, "packaging": {"purchase": 357985, "inventory": 81425, "usage": 276560}}}, {"week": 9, "week_start": "2026-06-29", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 48.93, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.4077, "items": [{"sku_id": "B_CREME", "qty": 32063, "hours": 26.72}, {"sku_id": "B_PLOM", "qty": 26648, "hours": 22.21}]}, "L2": {"active": true, "families": ["Эскимо"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 75488, "hours": 75.49}, {"sku_id": "E_VAN", "qty": 44512, "hours": 44.51}]}, "L3": {"active": true, "families": ["Стаканчик"], "production_hours": 71.75, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.5979, "items": [{"sku_id": "C_VAN", "qty": 19107, "hours": 27.3}, {"sku_id": "C_CREME", "qty": 26673, "hours": 44.45}]}, "L4": {"active": true, "families": ["Ведро", "Пломбир", "Стаканчик"], "production_hours": 190.0, "changeover_hours": 2.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 62732, "hours": 31.37}, {"sku_id": "P1000", "qty": 29306, "hours": 24.42}, {"sku_id": "P5L", "qty": 4483, "hours": 11.21}, {"sku_id": "C_VAN", "qty": 51396, "hours": 51.4}, {"sku_id": "C_CHOC", "qty": 50664, "hours": 53.33}, {"sku_id": "V5_PLOM", "qty": 3273, "hours": 7.27}, {"sku_id": "V5_CHOC", "qty": 4622, "hours": 11.0}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 46570, "E_VAN": 31720, "C_VAN": 25000, "C_CHOC": 17500, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 3210}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 120119, "inventory": 84, "usage": 122023}, "cream": {"purchase": 28335, "inventory": 302, "usage": 28801}, "sugar": {"purchase": 36358, "inventory": 595, "usage": 36969}, "cocoa": {"purchase": 2632, "inventory": 161, "usage": 3488}, "packaging": {"purchase": 422675, "inventory": 73133, "usage": 430967}}}, {"week": 10, "week_start": "2026-07-06", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 60.06, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.5005, "items": [{"sku_id": "B_CREME", "qty": 40819, "hours": 34.02}, {"sku_id": "B_PLOM", "qty": 31255, "hours": 26.05}]}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 118.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 76276, "hours": 76.28}, {"sku_id": "C_VAN", "qty": 50069, "hours": 41.72}]}, "L3": {"active": true, "families": ["Стаканчик"], "production_hours": 52.83, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.4402, "items": [{"sku_id": "C_CREME", "qty": 31695, "hours": 52.83}]}, "L4": {"active": true, "families": ["Ведро", "Пломбир", "Стаканчик"], "production_hours": 190.0, "changeover_hours": 2.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 95746, "hours": 47.87}, {"sku_id": "P1000", "qty": 30568, "hours": 25.47}, {"sku_id": "P5L", "qty": 4865, "hours": 12.16}, {"sku_id": "C_VAN", "qty": 32731, "hours": 32.73}, {"sku_id": "C_CHOC", "qty": 60342, "hours": 63.52}, {"sku_id": "V5_PLOM", "qty": 3708, "hours": 8.24}, {"sku_id": "V5_CHOC", "qty": 1, "hours": 0.0}]}}, "inventory": {"P500": 38507, "P1000": 10000, "P5L": 1500, "E_CHOC": 68923, "E_VAN": 7500, "C_VAN": 28315, "C_CHOC": 24035, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 120119, "inventory": 0, "usage": 120203}, "cream": {"purchase": 28335, "inventory": 248, "usage": 28390}, "sugar": {"purchase": 36358, "inventory": 480, "usage": 36474}, "cocoa": {"purchase": 2632, "inventory": 0, "usage": 2793}, "packaging": {"purchase": 422675, "inventory": 37733, "usage": 458075}}}, {"week": 11, "week_start": "2026-07-13", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 60.06, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.5005, "items": [{"sku_id": "B_CREME", "qty": 40819, "hours": 34.02}, {"sku_id": "B_PLOM", "qty": 31255, "hours": 26.05}]}, "L2": {"active": true, "families": ["Стаканчик"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "C_VAN", "qty": 76169, "hours": 63.47}, {"sku_id": "C_CREME", "qty": 56526, "hours": 56.53}]}, "L3": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 96.17, "changeover_hours": 1.5, "overtime_hours": 0.0, "utilization": 0.8139, "items": [{"sku_id": "E_VAN", "qty": 42363, "hours": 84.73}, {"sku_id": "C_CREME", "qty": 6864, "hours": 11.44}]}, "L4": {"active": true, "families": ["Ведро", "Пломбир", "Стаканчик"], "production_hours": 190.0, "changeover_hours": 2.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 63732, "hours": 31.87}, {"sku_id": "P1000", "qty": 30568, "hours": 25.47}, {"sku_id": "P5L", "qty": 4865, "hours": 12.16}, {"sku_id": "C_CHOC", "qty": 101079, "hours": 106.4}, {"sku_id": "V5_PLOM", "qty": 3708, "hours": 8.24}, {"sku_id": "V5_CHOC", "qty": 2461, "hours": 5.86}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 25643, "C_VAN": 25000, "C_CHOC": 71307, "C_CREME": 41695, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 120119, "inventory": 0, "usage": 120119}, "cream": {"purchase": 28335, "inventory": 0, "usage": 28583}, "sugar": {"purchase": 36358, "inventory": 0, "usage": 36838}, "cocoa": {"purchase": 2529, "inventory": 0, "usage": 2529}, "packaging": {"purchase": 422675, "inventory": 0, "usage": 460408}}}, {"week": 12, "week_start": "2026-07-20", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 36.18, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.3015, "items": [{"sku_id": "B_CREME", "qty": 12161, "hours": 10.13}, {"sku_id": "B_PLOM", "qty": 31255, "hours": 26.05}]}, "L2": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L3": {"active": true, "families": ["Эскимо"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 53923, "hours": 107.85}, {"sku_id": "E_VAN", "qty": 6077, "hours": 12.15}]}, "L4": {"active": true, "families": ["Брикет", "Ведро", "Пломбир", "Стаканчик"], "production_hours": 189.0, "changeover_hours": 3.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 79739, "hours": 39.87}, {"sku_id": "P1000", "qty": 30568, "hours": 25.47}, {"sku_id": "P5L", "qty": 4865, "hours": 12.16}, {"sku_id": "C_VAN", "qty": 79484, "hours": 79.48}, {"sku_id": "B_CREME", "qty": 28658, "hours": 17.91}, {"sku_id": "V5_PLOM", "qty": 3708, "hours": 8.24}, {"sku_id": "V5_CHOC", "qty": 2461, "hours": 5.86}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 25000, "C_CHOC": 17500, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 111723, "inventory": 0, "usage": 111723}, "cream": {"purchase": 26047, "inventory": 0, "usage": 26047}, "sugar": {"purchase": 33186, "inventory": 0, "usage": 33186}, "cocoa": {"purchase": 1775, "inventory": 0, "usage": 1775}, "packaging": {"purchase": 332899, "inventory": 0, "usage": 332899}}}], "totals": {"production_cost": 149732469.46, "changeover_cost": 213300.0, "holding_cost": 1405408.81, "raw_purchase_cost": 196898368.7, "raw_holding_cost": 18361.01, "overtime_cost": 263560.88, "shortfall_penalty": 0.0, "objective_recomputed": 348531468.87, "total_shortfall": 0, "total_production_hours": 3981.21, "total_changeover_hours": 40.5, "total_overtime_hours": 146.42}}, "demand": {"1": 307834, "2": 307834, "3": 307834, "4": 307834, "5": 372717, "6": 372717, "7": 372717, "8": 372717, "9": 372717, "10": 436544, "11": 436544, "12": 436544}, "sku_demand": {"B_CREME": {"1": 30285, "2": 30285, "3": 30285, "4": 30285, "5": 32063, "6": 32063, "7": 32063, "8": 32063, "9": 32063, "10": 40819, "11": 40819, "12": 40819}, "B_PLOM": {"1": 18890, "2": 18890, "3": 18890, "4": 18890, "5": 26648, "6": 26648, "7": 26648, "8": 26648, "9": 26648, "10": 31255, "11": 31255, "12": 31255}, "C_CHOC": {"1": 43365, "2": 43365, "3": 43365, "4": 43365, "5": 50664, "6": 50664, "7": 50664, "8": 50664, "9": 50664, "10": 53807, "11": 53807, "12": 53807}, "C_CREME": {"1": 23469, "2": 23469, "3": 23469, "4": 23469, "5": 26673, "6": 26673, "7": 26673, "8": 26673, "9": 26673, "10": 31695, "11": 31695, "12": 31695}, "C_VAN": {"1": 56071, "2": 56071, "3": 56071, "4": 56071, "5": 70503, "6": 70503, "7": 70503, "8": 70503, "9": 70503, "10": 79484, "11": 79484, "12": 79484}, "E_CHOC": {"1": 36175, "2": 36175, "3": 36175, "4": 36175, "5": 43918, "6": 43918, "7": 43918, "8": 43918, "9": 43918, "10": 53923, "11": 53923, "12": 53923}, "E_VAN": {"1": 17049, "2": 17049, "3": 17049, "4": 17049, "5": 20292, "6": 20292, "7": 20292, "8": 20292, "9": 20292, "10": 24220, "11": 24220, "12": 24220}, "P1000": {"1": 23036, "2": 23036, "3": 23036, "4": 23036, "5": 29306, "6": 29306, "7": 29306, "8": 29306, "9": 29306, "10": 30568, "11": 30568, "12": 30568}, "P500": {"1": 51647, "2": 51647, "3": 51647, "4": 51647, "5": 62732, "6": 62732, "7": 62732, "8": 62732, "9": 62732, "10": 79739, "11": 79739, "12": 79739}, "P5L": {"1": 3412, "2": 3412, "3": 3412, "4": 3412, "5": 4483, "6": 4483, "7": 4483, "8": 4483, "9": 4483, "10": 4865, "11": 4865, "12": 4865}, "V5_CHOC": {"1": 1639, "2": 1639, "3": 1639, "4": 1639, "5": 2162, "6": 2162, "7": 2162, "8": 2162, "9": 2162, "10": 2461, "11": 2461, "12": 2461}, "V5_PLOM": {"1": 2796, "2": 2796, "3": 2796, "4": 2796, "5": 3273, "6": 3273, "7": 3273, "8": 3273, "9": 3273, "10": 3708, "11": 3708, "12": 3708}}, "supply": {"cocoa": 2632, "cream": 28335, "milk": 120119, "packaging": 422675, "sugar": 36358}}, "hot": {"id": "hot", "name": "Жаркое лето +20%", "demand_mult": 1.2, "line_down": null, "plan": {"scenario": {"id": "hot", "name": "Жаркое лето +20%", "demand_mult": 1.2, "supply_mult": {"milk": 1.0, "cream": 1.0, "sugar": 1.0, "cocoa": 1.0, "packaging": 1.0}, "line_down": null}, "solver": {"status": 0, "message": "Optimization terminated successfully. (HiGHS Status 7: Optimal)", "objective": 425203356.11, "mip_gap": 0.001983, "mip_node_count": 4346, "solve_time_s": 59.11}, "weeks": [{"week": 1, "week_start": "2026-05-04", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 31.26, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.2605, "items": [{"sku_id": "B_CREME", "qty": 23841, "hours": 19.87}, {"sku_id": "B_PLOM", "qty": 13668, "hours": 11.39}]}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 118.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 81464, "hours": 81.46}, {"sku_id": "E_VAN", "qty": 1, "hours": 0.0}, {"sku_id": "C_VAN", "qty": 25528, "hours": 21.27}, {"sku_id": "C_CREME", "qty": 15262, "hours": 15.26}]}, "L3": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 30.75, "changeover_hours": 1.5, "overtime_hours": 0.0, "utilization": 0.2688, "items": [{"sku_id": "E_VAN", "qty": 12958, "hours": 25.92}, {"sku_id": "C_CREME", "qty": 2901, "hours": 4.84}]}, "L4": {"active": true, "families": ["Брикет", "Ведро", "Пломбир", "Стаканчик"], "production_hours": 189.0, "changeover_hours": 3.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 39476, "hours": 19.74}, {"sku_id": "P1000", "qty": 17643, "hours": 14.7}, {"sku_id": "P5L", "qty": 10782, "hours": 26.95}, {"sku_id": "C_VAN", "qty": 16757, "hours": 16.76}, {"sku_id": "C_CHOC", "qty": 86576, "hours": 91.13}, {"sku_id": "B_CREME", "qty": 1, "hours": 0.0}, {"sku_id": "V5_PLOM", "qty": 5460, "hours": 12.13}, {"sku_id": "V5_CHOC", "qty": 3184, "hours": 7.58}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 9688, "E_CHOC": 68054, "E_VAN": 7500, "C_VAN": 25000, "C_CHOC": 69538, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 4605, "V5_CHOC": 2717}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 84973, "inventory": 35591, "usage": 124692}, "cream": {"purchase": 19426, "inventory": 7945, "usage": 29246}, "sugar": {"purchase": 24270, "inventory": 9649, "usage": 37416}, "cocoa": {"purchase": 2255, "inventory": 130, "usage": 3775}, "packaging": {"purchase": 246325, "inventory": 155824, "usage": 355502}}}, {"week": 2, "week_start": "2026-05-11", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 30.07, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.2506, "items": [{"sku_id": "B_CREME", "qty": 13421, "hours": 11.18}, {"sku_id": "B_PLOM", "qty": 22668, "hours": 18.89}]}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 118.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 33766, "hours": 33.77}, {"sku_id": "C_VAN", "qty": 67285, "hours": 56.07}, {"sku_id": "C_CREME", "qty": 28163, "hours": 28.16}]}, "L3": {"active": true, "families": ["Эскимо"], "production_hours": 81.84, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.682, "items": [{"sku_id": "E_VAN", "qty": 40918, "hours": 81.84}]}, "L4": {"active": true, "families": ["Брикет", "Пломбир"], "production_hours": 191.0, "changeover_hours": 1.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 261206, "hours": 130.6}, {"sku_id": "P1000", "qty": 55286, "hours": 46.07}, {"sku_id": "B_CREME", "qty": 22921, "hours": 14.33}]}}, "inventory": {"P500": 221730, "P1000": 37643, "P5L": 5594, "E_CHOC": 58410, "E_VAN": 27959, "C_VAN": 25000, "C_CHOC": 17500, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 120119, "inventory": 0, "usage": 155710}, "cream": {"purchase": 28335, "inventory": 0, "usage": 36280}, "sugar": {"purchase": 36358, "inventory": 0, "usage": 46007}, "cocoa": {"purchase": 2632, "inventory": 1764, "usage": 998}, "packaging": {"purchase": 422675, "inventory": 32864, "usage": 545634}}}, {"week": 3, "week_start": "2026-05-18", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик"], "production_hours": 134.24, "changeover_hours": 0.0, "overtime_hours": 14.24, "utilization": 1.1187, "items": [{"sku_id": "C_VAN", "qty": 67285, "hours": 56.07}, {"sku_id": "C_CHOC", "qty": 85987, "hours": 78.17}]}, "L3": {"active": true, "families": ["Стаканчик"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "C_CHOC", "qty": 16980, "hours": 26.12}, {"sku_id": "C_CREME", "qty": 56326, "hours": 93.88}]}, "L4": {"active": true, "families": ["Брикет", "Ведро"], "production_hours": 167.0, "changeover_hours": 1.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "B_CREME", "qty": 188111, "hours": 117.57}, {"sku_id": "B_PLOM", "qty": 26278, "hours": 16.42}, {"sku_id": "V5_PLOM", "qty": 10638, "hours": 23.64}, {"sku_id": "V5_CHOC", "qty": 3934, "hours": 9.37}]}}, "inventory": {"P500": 159754, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 25000, "C_CHOC": 68429, "C_CREME": 38163, "B_CREME": 164269, "B_PLOM": 12610, "V5_PLOM": 8533, "V5_CHOC": 2717}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 99387, "inventory": 0, "usage": 99387}, "cream": {"purchase": 24035, "inventory": 0, "usage": 24035}, "sugar": {"purchase": 31359, "inventory": 0, "usage": 31359}, "cocoa": {"purchase": 2632, "inventory": 842, "usage": 3553}, "packaging": {"purchase": 422675, "inventory": 0, "usage": 455539}}}, {"week": 4, "week_start": "2026-05-25", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 138.0, "changeover_hours": 2.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "E_CHOC", "qty": 60462, "hours": 60.46}, {"sku_id": "E_VAN", "qty": 20459, "hours": 20.46}, {"sku_id": "C_VAN", "qty": 67285, "hours": 56.07}, {"sku_id": "C_CHOC", "qty": 1109, "hours": 1.01}]}, "L3": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L4": {"active": true, "families": ["Брикет", "Пломбир"], "production_hours": 167.0, "changeover_hours": 1.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P1000", "qty": 97977, "hours": 81.65}, {"sku_id": "P5L", "qty": 5332, "hours": 13.33}, {"sku_id": "B_CREME", "qty": 1, "hours": 0.0}, {"sku_id": "B_PLOM", "qty": 115234, "hours": 72.02}]}}, "inventory": {"P500": 97778, "P1000": 80334, "P5L": 2738, "E_CHOC": 32052, "E_VAN": 7500, "C_VAN": 25000, "C_CHOC": 17500, "C_CREME": 10000, "B_CREME": 127928, "B_PLOM": 105176, "V5_PLOM": 5178, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 117625, "inventory": 0, "usage": 117625}, "cream": {"purchase": 27537, "inventory": 0, "usage": 27537}, "sugar": {"purchase": 35489, "inventory": 321, "usage": 35168}, "cocoa": {"purchase": 2632, "inventory": 2249, "usage": 1226}, "packaging": {"purchase": 420128, "inventory": 52269, "usage": 367859}}}, {"week": 5, "week_start": "2026-06-01", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "C_VAN", "qty": 67181, "hours": 55.98}, {"sku_id": "C_CREME", "qty": 64016, "hours": 64.02}]}, "L3": {"active": true, "families": ["Эскимо"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 35650, "hours": 71.3}, {"sku_id": "E_VAN", "qty": 24350, "hours": 48.7}]}, "L4": {"active": true, "families": ["Ведро", "Пломбир", "Стаканчик"], "production_hours": 190.0, "changeover_hours": 2.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P5L", "qty": 15571, "hours": 38.93}, {"sku_id": "C_VAN", "qty": 17423, "hours": 17.42}, {"sku_id": "C_CHOC", "qty": 106278, "hours": 111.87}, {"sku_id": "V5_CHOC", "qty": 9147, "hours": 21.78}]}}, "inventory": {"P500": 22500, "P1000": 45167, "P5L": 12930, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 25000, "C_CHOC": 62981, "C_CREME": 42008, "B_CREME": 89452, "B_PLOM": 73198, "V5_PLOM": 1250, "V5_CHOC": 7303}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 119202, "inventory": 0, "usage": 119202}, "cream": {"purchase": 28335, "inventory": 68, "usage": 28267}, "sugar": {"purchase": 36358, "inventory": 320, "usage": 36359}, "cocoa": {"purchase": 2632, "inventory": 424, "usage": 4457}, "packaging": {"purchase": 422675, "inventory": 135329, "usage": 339615}}}, {"week": 6, "week_start": "2026-06-08", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": [{"sku_id": "B_PLOM", "qty": 1, "hours": 0.0}]}, "L2": {"active": true, "families": ["Эскимо"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 115158, "hours": 115.16}, {"sku_id": "E_VAN", "qty": 4842, "hours": 4.84}]}, "L3": {"active": true, "families": ["Эскимо"], "production_hours": 39.02, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.3251, "items": [{"sku_id": "E_VAN", "qty": 19508, "hours": 39.02}]}, "L4": {"active": true, "families": ["Ведро", "Пломбир", "Стаканчик"], "production_hours": 190.0, "changeover_hours": 2.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 75278, "hours": 37.64}, {"sku_id": "P5L", "qty": 4709, "hours": 11.77}, {"sku_id": "C_VAN", "qty": 84604, "hours": 84.6}, {"sku_id": "C_CHOC", "qty": 32175, "hours": 33.87}, {"sku_id": "V5_PLOM", "qty": 9952, "hours": 22.12}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 12259, "E_CHOC": 77456, "E_VAN": 7500, "C_VAN": 25000, "C_CHOC": 34358, "C_CREME": 10000, "B_CREME": 50976, "B_PLOM": 41221, "V5_PLOM": 7274, "V5_CHOC": 4709}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 120119, "inventory": 14038, "usage": 106081}, "cream": {"purchase": 28335, "inventory": 3547, "usage": 24856}, "sugar": {"purchase": 36358, "inventory": 4821, "usage": 31857}, "cocoa": {"purchase": 2632, "inventory": 270, "usage": 2786}, "packaging": {"purchase": 422675, "inventory": 211777, "usage": 346227}}}, {"week": 7, "week_start": "2026-06-15", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Эскимо"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 95650, "hours": 95.65}, {"sku_id": "E_VAN", "qty": 24350, "hours": 24.35}]}, "L3": {"active": true, "families": ["Стаканчик"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "C_CHOC", "qty": 6460, "hours": 9.94}, {"sku_id": "C_CREME", "qty": 66037, "hours": 110.06}]}, "L4": {"active": true, "families": ["Пломбир", "Стаканчик"], "production_hours": 191.0, "changeover_hours": 1.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 75278, "hours": 37.64}, {"sku_id": "P1000", "qty": 35167, "hours": 29.31}, {"sku_id": "C_VAN", "qty": 84604, "hours": 84.6}, {"sku_id": "C_CHOC", "qty": 37479, "hours": 39.45}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 6879, "E_CHOC": 120404, "E_VAN": 7500, "C_VAN": 25000, "C_CHOC": 17500, "C_CREME": 44029, "B_CREME": 12500, "B_PLOM": 9243, "V5_PLOM": 3346, "V5_CHOC": 2115}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 120119, "inventory": 49335, "usage": 84822}, "cream": {"purchase": 28335, "inventory": 11439, "usage": 20444}, "sugar": {"purchase": 36358, "inventory": 14678, "usage": 26502}, "cocoa": {"purchase": 2632, "inventory": 0, "usage": 2902}, "packaging": {"purchase": 422675, "inventory": 209427, "usage": 425025}}}, {"week": 8, "week_start": "2026-06-22", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 127.79, "changeover_hours": 2.0, "overtime_hours": 9.79, "utilization": 1.0816, "items": [{"sku_id": "E_VAN", "qty": 48700, "hours": 48.7}, {"sku_id": "C_VAN", "qty": 69070, "hours": 57.56}, {"sku_id": "C_CREME", "qty": 21530, "hours": 21.53}]}, "L3": {"active": true, "families": ["Стаканчик"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "C_VAN", "qty": 18526, "hours": 26.47}, {"sku_id": "C_CHOC", "qty": 60797, "hours": 93.53}]}, "L4": {"active": true, "families": ["Брикет", "Ведро", "Пломбир"], "production_hours": 190.0, "changeover_hours": 2.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 131478, "hours": 65.74}, {"sku_id": "P1000", "qty": 35167, "hours": 29.31}, {"sku_id": "P5L", "qty": 1, "hours": 0.0}, {"sku_id": "B_CREME", "qty": 51419, "hours": 32.14}, {"sku_id": "B_PLOM", "qty": 31735, "hours": 19.83}, {"sku_id": "V5_PLOM", "qty": 12081, "hours": 26.85}, {"sku_id": "V5_CHOC", "qty": 6776, "hours": 16.13}]}}, "inventory": {"P500": 78700, "P1000": 10000, "P5L": 1500, "E_CHOC": 67702, "E_VAN": 31850, "C_VAN": 27992, "C_CHOC": 17500, "C_CREME": 33551, "B_CREME": 25443, "B_PLOM": 9000, "V5_PLOM": 11499, "V5_CHOC": 6297}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 120119, "inventory": 0, "usage": 169454}, "cream": {"purchase": 28335, "inventory": 230, "usage": 39543}, "sugar": {"purchase": 36358, "inventory": 667, "usage": 50369}, "cocoa": {"purchase": 2632, "inventory": 0, "usage": 2632}, "packaging": {"purchase": 422675, "inventory": 144821, "usage": 487281}}}, {"week": 9, "week_start": "2026-06-29", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "B_CREME", "qty": 74516, "hours": 62.1}, {"sku_id": "B_PLOM", "qty": 69484, "hours": 57.9}]}, "L2": {"active": true, "families": ["Стаканчик"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "C_VAN", "qty": 152970, "hours": 127.47}, {"sku_id": "C_CREME", "qty": 12525, "hours": 12.53}]}, "L3": {"active": true, "families": ["Стаканчик"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "C_CREME", "qty": 72000, "hours": 120.0}]}, "L4": {"active": true, "families": ["Пломбир", "Стаканчик"], "production_hours": 191.0, "changeover_hours": 1.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 19078, "hours": 9.54}, {"sku_id": "P1000", "qty": 35167, "hours": 29.31}, {"sku_id": "P5L", "qty": 9303, "hours": 23.26}, {"sku_id": "C_VAN", "qty": 1, "hours": 0.0}, {"sku_id": "C_CHOC", "qty": 122453, "hours": 128.9}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 5423, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 96359, "C_CHOC": 79156, "C_CREME": 86068, "B_CREME": 61483, "B_PLOM": 46506, "V5_PLOM": 7571, "V5_CHOC": 3703}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 120119, "inventory": 2991, "usage": 117128}, "cream": {"purchase": 28335, "inventory": 229, "usage": 28336}, "sugar": {"purchase": 36358, "inventory": 0, "usage": 37025}, "cocoa": {"purchase": 2632, "inventory": 0, "usage": 2632}, "packaging": {"purchase": 422675, "inventory": 0, "usage": 567496}}}, {"week": 10, "week_start": "2026-07-06", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Эскимо"], "production_hours": 129.41, "changeover_hours": 0.0, "overtime_hours": 9.41, "utilization": 1.0785, "items": [{"sku_id": "E_CHOC", "qty": 129415, "hours": 129.41}]}, "L3": {"active": true, "families": ["Эскимо"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 1, "hours": 0.0}, {"sku_id": "E_VAN", "qty": 59999, "hours": 120.0}]}, "L4": {"active": true, "families": ["Пломбир", "Стаканчик"], "production_hours": 191.0, "changeover_hours": 1.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 95687, "hours": 47.84}, {"sku_id": "P1000", "qty": 36682, "hours": 30.57}, {"sku_id": "P5L", "qty": 7753, "hours": 19.38}, {"sku_id": "C_VAN", "qty": 90139, "hours": 90.14}, {"sku_id": "C_CHOC", "qty": 2912, "hours": 3.07}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 7338, "E_CHOC": 79708, "E_VAN": 38435, "C_VAN": 91117, "C_CHOC": 17500, "C_CREME": 48034, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 3121, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 120119, "inventory": 4770, "usage": 118340}, "cream": {"purchase": 28335, "inventory": 828, "usage": 27736}, "sugar": {"purchase": 36358, "inventory": 866, "usage": 35492}, "cocoa": {"purchase": 2632, "inventory": 0, "usage": 2632}, "packaging": {"purchase": 422589, "inventory": 0, "usage": 422589}}}, {"week": 11, "week_start": "2026-07-13", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 72.07, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.6006, "items": [{"sku_id": "B_CREME", "qty": 48983, "hours": 40.82}, {"sku_id": "B_PLOM", "qty": 37506, "hours": 31.25}]}, "L2": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L3": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L4": {"active": true, "families": ["Ведро", "Пломбир", "Стаканчик"], "production_hours": 190.0, "changeover_hours": 2.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 95687, "hours": 47.84}, {"sku_id": "P1000", "qty": 36682, "hours": 30.57}, {"sku_id": "C_VAN", "qty": 29264, "hours": 29.26}, {"sku_id": "C_CHOC", "qty": 64568, "hours": 67.97}, {"sku_id": "V5_PLOM", "qty": 2579, "hours": 5.73}, {"sku_id": "V5_CHOC", "qty": 3623, "hours": 8.63}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 9371, "C_VAN": 25000, "C_CHOC": 17500, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 1420}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 120119, "inventory": 24251, "usage": 100638}, "cream": {"purchase": 28335, "inventory": 5737, "usage": 23426}, "sugar": {"purchase": 36358, "inventory": 7373, "usage": 29851}, "cocoa": {"purchase": 2460, "inventory": 522, "usage": 1938}, "packaging": {"purchase": 417530, "inventory": 98638, "usage": 318892}}}, {"week": 12, "week_start": "2026-07-20", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 72.07, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.6006, "items": [{"sku_id": "B_CREME", "qty": 48983, "hours": 40.82}, {"sku_id": "B_PLOM", "qty": 37506, "hours": 31.25}]}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 138.0, "changeover_hours": 2.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "E_CHOC", "qty": 31901, "hours": 31.9}, {"sku_id": "C_VAN", "qty": 81678, "hours": 68.07}, {"sku_id": "C_CREME", "qty": 38034, "hours": 38.03}]}, "L3": {"active": true, "families": ["Эскимо"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 32807, "hours": 65.61}, {"sku_id": "E_VAN", "qty": 27193, "hours": 54.39}]}, "L4": {"active": true, "families": ["Ведро", "Пломбир", "Стаканчик"], "production_hours": 190.0, "changeover_hours": 2.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 95687, "hours": 47.84}, {"sku_id": "P1000", "qty": 36682, "hours": 30.57}, {"sku_id": "P5L", "qty": 5838, "hours": 14.6}, {"sku_id": "C_VAN", "qty": 13703, "hours": 13.7}, {"sku_id": "C_CHOC", "qty": 64568, "hours": 67.97}, {"sku_id": "V5_PLOM", "qty": 4450, "hours": 9.89}, {"sku_id": "V5_CHOC", "qty": 2283, "hours": 5.43}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 25000, "C_CHOC": 17500, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 120119, "inventory": 0, "usage": 144370}, "cream": {"purchase": 28335, "inventory": 0, "usage": 34072}, "sugar": {"purchase": 36358, "inventory": 0, "usage": 43731}, "cocoa": {"purchase": 2632, "inventory": 0, "usage": 3154}, "packaging": {"purchase": 422675, "inventory": 0, "usage": 521313}}}], "totals": {"production_cost": 181267783.98, "changeover_cost": 197900.0, "holding_cost": 2723064.66, "raw_purchase_cost": 240197559.0, "raw_holding_cost": 244882.73, "overtime_cost": 572165.73, "shortfall_penalty": 0.0, "objective_recomputed": 425203356.11, "total_shortfall": 0, "total_production_hours": 4957.53, "total_changeover_hours": 30.5, "total_overtime_hours": 333.44}}, "demand": {"1": 369401, "2": 369401, "3": 369401, "4": 369401, "5": 447260, "6": 447260, "7": 447260, "8": 447260, "9": 447260, "10": 523853, "11": 523853, "12": 523853}, "sku_demand": {"B_CREME": {"1": 36342, "2": 36342, "3": 36342, "4": 36342, "5": 38476, "6": 38476, "7": 38476, "8": 38476, "9": 38476, "10": 48983, "11": 48983, "12": 48983}, "B_PLOM": {"1": 22668, "2": 22668, "3": 22668, "4": 22668, "5": 31978, "6": 31978, "7": 31978, "8": 31978, "9": 31978, "10": 37506, "11": 37506, "12": 37506}, "C_CHOC": {"1": 52038, "2": 52038, "3": 52038, "4": 52038, "5": 60797, "6": 60797, "7": 60797, "8": 60797, "9": 60797, "10": 64568, "11": 64568, "12": 64568}, "C_CREME": {"1": 28163, "2": 28163, "3": 28163, "4": 28163, "5": 32008, "6": 32008, "7": 32008, "8": 32008, "9": 32008, "10": 38034, "11": 38034, "12": 38034}, "C_VAN": {"1": 67285, "2": 67285, "3": 67285, "4": 67285, "5": 84604, "6": 84604, "7": 84604, "8": 84604, "9": 84604, "10": 95381, "11": 95381, "12": 95381}, "E_CHOC": {"1": 43410, "2": 43410, "3": 43410, "4": 43410, "5": 52702, "6": 52702, "7": 52702, "8": 52702, "9": 52702, "10": 64708, "11": 64708, "12": 64708}, "E_VAN": {"1": 20459, "2": 20459, "3": 20459, "4": 20459, "5": 24350, "6": 24350, "7": 24350, "8": 24350, "9": 24350, "10": 29064, "11": 29064, "12": 29064}, "P1000": {"1": 27643, "2": 27643, "3": 27643, "4": 27643, "5": 35167, "6": 35167, "7": 35167, "8": 35167, "9": 35167, "10": 36682, "11": 36682, "12": 36682}, "P500": {"1": 61976, "2": 61976, "3": 61976, "4": 61976, "5": 75278, "6": 75278, "7": 75278, "8": 75278, "9": 75278, "10": 95687, "11": 95687, "12": 95687}, "P5L": {"1": 4094, "2": 4094, "3": 4094, "4": 4094, "5": 5380, "6": 5380, "7": 5380, "8": 5380, "9": 5380, "10": 5838, "11": 5838, "12": 5838}, "V5_CHOC": {"1": 1967, "2": 1967, "3": 1967, "4": 1967, "5": 2594, "6": 2594, "7": 2594, "8": 2594, "9": 2594, "10": 2953, "11": 2953, "12": 2953}, "V5_PLOM": {"1": 3355, "2": 3355, "3": 3355, "4": 3355, "5": 3928, "6": 3928, "7": 3928, "8": 3928, "9": 3928, "10": 4450, "11": 4450, "12": 4450}}, "supply": {"cocoa": 2632, "cream": 28335, "milk": 120119, "packaging": 422675, "sugar": 36358}}, "milk": {"id": "milk", "name": "Дефицит молока −30%", "demand_mult": 1.0, "line_down": null, "plan": {"scenario": {"id": "milk", "name": "Дефицит молока −30%", "demand_mult": 1.0, "supply_mult": {"milk": 0.7, "cream": 1.0, "sugar": 1.0, "cocoa": 1.0, "packaging": 1.0}, "line_down": null}, "solver": {"status": 0, "message": "Optimization terminated successfully. (HiGHS Status 7: Optimal)", "objective": 352702316.68, "mip_gap": 0.001348, "mip_node_count": 1231, "solve_time_s": 22.08}, "weeks": [{"week": 1, "week_start": "2026-05-04", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 118.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 57350, "hours": 57.35}, {"sku_id": "E_VAN", "qty": 34149, "hours": 34.15}, {"sku_id": "C_CHOC", "qty": 14336, "hours": 13.03}, {"sku_id": "C_CREME", "qty": 13469, "hours": 13.47}]}, "L3": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L4": {"active": true, "families": ["Брикет", "Ведро", "Пломбир", "Стаканчик"], "production_hours": 165.0, "changeover_hours": 3.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P500", "qty": 132441, "hours": 66.22}, {"sku_id": "P1000", "qty": 36072, "hours": 30.06}, {"sku_id": "P5L", "qty": 1912, "hours": 4.78}, {"sku_id": "C_VAN", "qty": 31071, "hours": 31.07}, {"sku_id": "C_CHOC", "qty": 11529, "hours": 12.14}, {"sku_id": "B_CREME", "qty": 17785, "hours": 11.12}, {"sku_id": "B_PLOM", "qty": 9890, "hours": 6.18}, {"sku_id": "V5_PLOM", "qty": 1546, "hours": 3.44}]}}, "inventory": {"P500": 125794, "P1000": 33036, "P5L": 1500, "E_CHOC": 51175, "E_VAN": 32100, "C_VAN": 25000, "C_CHOC": 17500, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 889}, "materials": {"milk": {"purchase": 84083, "inventory": 54344, "usage": 105049}, "cream": {"purchase": 6771, "inventory": 0, "usage": 24536}, "sugar": {"purchase": 8420, "inventory": 0, "usage": 31215}, "cocoa": {"purchase": 41, "inventory": 0, "usage": 1691}, "packaging": {"purchase": 96550, "inventory": 0, "usage": 361550}}}, {"week": 2, "week_start": "2026-05-11", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик"], "production_hours": 67.69, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.564, "items": [{"sku_id": "C_VAN", "qty": 24897, "hours": 20.75}, {"sku_id": "C_CREME", "qty": 46938, "hours": 46.94}]}, "L3": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L4": {"active": true, "families": ["Брикет", "Ведро", "Пломбир", "Стаканчик"], "production_hours": 165.0, "changeover_hours": 3.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P5L", "qty": 3412, "hours": 8.53}, {"sku_id": "C_VAN", "qty": 59450, "hours": 59.45}, {"sku_id": "C_CHOC", "qty": 57068, "hours": 60.07}, {"sku_id": "B_CREME", "qty": 30285, "hours": 18.93}, {"sku_id": "B_PLOM", "qty": 18890, "hours": 11.81}, {"sku_id": "V5_PLOM", "qty": 2796, "hours": 6.21}]}}, "inventory": {"P500": 74147, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 15051, "C_VAN": 53276, "C_CHOC": 31203, "C_CREME": 33469, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 1639}, "materials": {"milk": {"purchase": 84083, "inventory": 91963, "usage": 46464}, "cream": {"purchase": 11385, "inventory": 0, "usage": 11385}, "sugar": {"purchase": 15002, "inventory": 0, "usage": 15002}, "cocoa": {"purchase": 1242, "inventory": 0, "usage": 1242}, "packaging": {"purchase": 243736, "inventory": 0, "usage": 243736}}}, {"week": 3, "week_start": "2026-05-18", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 118.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 72350, "hours": 72.35}, {"sku_id": "E_VAN", "qty": 45649, "hours": 45.65}, {"sku_id": "C_CHOC", "qty": 1, "hours": 0.0}]}, "L3": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L4": {"active": true, "families": ["Брикет", "Ведро", "Пломбир", "Стаканчик"], "production_hours": 165.0, "changeover_hours": 3.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P1000", "qty": 23036, "hours": 19.2}, {"sku_id": "P5L", "qty": 3412, "hours": 8.53}, {"sku_id": "C_VAN", "qty": 27795, "hours": 27.8}, {"sku_id": "C_CHOC", "qty": 68904, "hours": 72.53}, {"sku_id": "B_CREME", "qty": 30285, "hours": 18.93}, {"sku_id": "B_PLOM", "qty": 18890, "hours": 11.81}, {"sku_id": "V5_PLOM", "qty": 2796, "hours": 6.21}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 51175, "E_VAN": 43651, "C_VAN": 25000, "C_CHOC": 56743, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 1639}, "materials": {"milk": {"purchase": 84083, "inventory": 108462, "usage": 67584}, "cream": {"purchase": 16085, "inventory": 0, "usage": 16085}, "sugar": {"purchase": 20887, "inventory": 0, "usage": 20887}, "cocoa": {"purchase": 2632, "inventory": 0, "usage": 2632}, "packaging": {"purchase": 293118, "inventory": 0, "usage": 293118}}}, {"week": 4, "week_start": "2026-05-25", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "C_VAN", "qty": 56071, "hours": 46.73}, {"sku_id": "C_CHOC", "qty": 54786, "hours": 49.81}, {"sku_id": "C_CREME", "qty": 23469, "hours": 23.47}]}, "L3": {"active": true, "families": ["Эскимо"], "production_hours": 2.38, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0198, "items": [{"sku_id": "E_VAN", "qty": 1190, "hours": 2.38}]}, "L4": {"active": true, "families": ["Брикет", "Ведро", "Пломбир"], "production_hours": 166.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P500", "qty": 55874, "hours": 27.94}, {"sku_id": "P1000", "qty": 23036, "hours": 19.2}, {"sku_id": "P5L", "qty": 3412, "hours": 8.53}, {"sku_id": "B_CREME", "qty": 94411, "hours": 59.01}, {"sku_id": "B_PLOM", "qty": 72186, "hours": 45.12}, {"sku_id": "V5_PLOM", "qty": 2796, "hours": 6.21}]}}, "inventory": {"P500": 26727, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 27792, "C_VAN": 25000, "C_CHOC": 68164, "C_CREME": 10000, "B_CREME": 76626, "B_PLOM": 62296, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 1639}, "materials": {"milk": {"purchase": 84083, "inventory": 101568, "usage": 90976}, "cream": {"purchase": 21631, "inventory": 0, "usage": 21631}, "sugar": {"purchase": 27933, "inventory": 0, "usage": 27933}, "cocoa": {"purchase": 1411, "inventory": 0, "usage": 1411}, "packaging": {"purchase": 387231, "inventory": 0, "usage": 387231}}}, {"week": 5, "week_start": "2026-06-01", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик"], "production_hours": 92.65, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.7721, "items": [{"sku_id": "C_VAN", "qty": 47160, "hours": 39.3}, {"sku_id": "C_CREME", "qty": 53346, "hours": 53.35}]}, "L3": {"active": true, "families": ["Эскимо"], "production_hours": 87.84, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.732, "items": [{"sku_id": "E_CHOC", "qty": 43918, "hours": 87.84}]}, "L4": {"active": true, "families": ["Ведро", "Пломбир", "Стаканчик"], "production_hours": 166.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P500", "qty": 58505, "hours": 29.25}, {"sku_id": "P1000", "qty": 29306, "hours": 24.42}, {"sku_id": "P5L", "qty": 4483, "hours": 11.21}, {"sku_id": "C_VAN", "qty": 93845, "hours": 93.84}, {"sku_id": "V5_PLOM", "qty": 3273, "hours": 7.27}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 95502, "C_CHOC": 17500, "C_CREME": 36673, "B_CREME": 44563, "B_PLOM": 35648, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 2162}, "materials": {"milk": {"purchase": 84083, "inventory": 92809, "usage": 92842}, "cream": {"purchase": 22017, "inventory": 0, "usage": 22017}, "sugar": {"purchase": 28293, "inventory": 0, "usage": 28293}, "cocoa": {"purchase": 1581, "inventory": 436, "usage": 1145}, "packaging": {"purchase": 333836, "inventory": 0, "usage": 333836}}}, {"week": 6, "week_start": "2026-06-08", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 118.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 77415, "hours": 77.42}, {"sku_id": "E_VAN", "qty": 40584, "hours": 40.58}, {"sku_id": "C_CHOC", "qty": 1, "hours": 0.0}]}, "L3": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L4": {"active": true, "families": ["Ведро", "Пломбир", "Стаканчик"], "production_hours": 180.93, "changeover_hours": 2.0, "overtime_hours": 14.93, "utilization": 1.0889, "items": [{"sku_id": "P500", "qty": 62732, "hours": 31.37}, {"sku_id": "P1000", "qty": 29306, "hours": 24.42}, {"sku_id": "P5L", "qty": 4483, "hours": 11.21}, {"sku_id": "C_VAN", "qty": 1, "hours": 0.0}, {"sku_id": "C_CHOC", "qty": 101327, "hours": 106.66}, {"sku_id": "V5_PLOM", "qty": 3273, "hours": 7.27}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 48497, "E_VAN": 27792, "C_VAN": 25000, "C_CHOC": 68164, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 2162}, "materials": {"milk": {"purchase": 84083, "inventory": 82983, "usage": 93909}, "cream": {"purchase": 21986, "inventory": 0, "usage": 21986}, "sugar": {"purchase": 28157, "inventory": 0, "usage": 28157}, "cocoa": {"purchase": 2632, "inventory": 0, "usage": 3068}, "packaging": {"purchase": 319122, "inventory": 0, "usage": 319122}}}, {"week": 7, "week_start": "2026-06-15", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "C_VAN", "qty": 92713, "hours": 77.26}, {"sku_id": "C_CREME", "qty": 42739, "hours": 42.74}]}, "L3": {"active": true, "families": ["Эскимо"], "production_hours": 20.84, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.1737, "items": [{"sku_id": "E_CHOC", "qty": 10421, "hours": 20.84}]}, "L4": {"active": true, "families": ["Брикет", "Ведро", "Пломбир", "Стаканчик"], "production_hours": 165.0, "changeover_hours": 3.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P500", "qty": 62732, "hours": 31.37}, {"sku_id": "P1000", "qty": 29306, "hours": 24.42}, {"sku_id": "P5L", "qty": 4483, "hours": 11.21}, {"sku_id": "C_VAN", "qty": 17343, "hours": 17.34}, {"sku_id": "B_CREME", "qty": 64126, "hours": 40.08}, {"sku_id": "B_PLOM", "qty": 53296, "hours": 33.31}, {"sku_id": "V5_PLOM", "qty": 3273, "hours": 7.27}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 64553, "C_CHOC": 17500, "C_CREME": 26066, "B_CREME": 44563, "B_PLOM": 35648, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 2162}, "materials": {"milk": {"purchase": 84083, "inventory": 66829, "usage": 100237}, "cream": {"purchase": 23781, "inventory": 0, "usage": 23781}, "sugar": {"purchase": 30566, "inventory": 0, "usage": 30566}, "cocoa": {"purchase": 743, "inventory": 0, "usage": 743}, "packaging": {"purchase": 380432, "inventory": 0, "usage": 380432}}}, {"week": 8, "week_start": "2026-06-22", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 118.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 50864, "hours": 50.86}, {"sku_id": "E_VAN", "qty": 29857, "hours": 29.86}, {"sku_id": "C_CREME", "qty": 37279, "hours": 37.28}]}, "L3": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L4": {"active": true, "families": ["Ведро", "Пломбир", "Стаканчик"], "production_hours": 166.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P500", "qty": 62732, "hours": 31.37}, {"sku_id": "P1000", "qty": 29306, "hours": 24.42}, {"sku_id": "P5L", "qty": 4483, "hours": 11.21}, {"sku_id": "C_VAN", "qty": 30950, "hours": 30.95}, {"sku_id": "C_CHOC", "qty": 57742, "hours": 60.78}, {"sku_id": "V5_PLOM", "qty": 3273, "hours": 7.27}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 21946, "E_VAN": 17065, "C_VAN": 25000, "C_CHOC": 24578, "C_CREME": 36672, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 2162}, "materials": {"milk": {"purchase": 84083, "inventory": 59012, "usage": 91900}, "cream": {"purchase": 21670, "inventory": 0, "usage": 21670}, "sugar": {"purchase": 27715, "inventory": 0, "usage": 27715}, "cocoa": {"purchase": 2070, "inventory": 0, "usage": 2070}, "packaging": {"purchase": 313210, "inventory": 6724, "usage": 306486}}}, {"week": 9, "week_start": "2026-06-29", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 74.97, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.6248, "items": [{"sku_id": "B_CREME", "qty": 32063, "hours": 26.72}, {"sku_id": "B_PLOM", "qty": 57903, "hours": 48.25}]}, "L2": {"active": true, "families": ["Эскимо"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 90895, "hours": 90.89}, {"sku_id": "E_VAN", "qty": 29105, "hours": 29.11}]}, "L3": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 11.69, "changeover_hours": 1.5, "overtime_hours": 0.0, "utilization": 0.1099, "items": [{"sku_id": "E_VAN", "qty": 5842, "hours": 11.68}, {"sku_id": "C_CREME", "qty": 1, "hours": 0.0}]}, "L4": {"active": true, "families": ["Ведро", "Пломбир", "Стаканчик"], "production_hours": 190.0, "changeover_hours": 2.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 62732, "hours": 31.37}, {"sku_id": "P1000", "qty": 29306, "hours": 24.42}, {"sku_id": "P5L", "qty": 4483, "hours": 11.21}, {"sku_id": "C_VAN", "qty": 70503, "hours": 70.5}, {"sku_id": "C_CHOC", "qty": 43586, "hours": 45.88}, {"sku_id": "V5_PLOM", "qty": 2980, "hours": 6.62}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 68923, "E_VAN": 31720, "C_VAN": 25000, "C_CHOC": 17500, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 40255, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 293, "V5_CHOC": 2162}, "materials": {"milk": {"purchase": 84083, "inventory": 37198, "usage": 105896}, "cream": {"purchase": 25004, "inventory": 0, "usage": 25004}, "sugar": {"purchase": 32223, "inventory": 0, "usage": 32223}, "cocoa": {"purchase": 2632, "inventory": 0, "usage": 2632}, "packaging": {"purchase": 422675, "inventory": 0, "usage": 429399}}}, {"week": 10, "week_start": "2026-07-06", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "C_VAN", "qty": 73140, "hours": 60.95}, {"sku_id": "C_CREME", "qty": 59050, "hours": 59.05}]}, "L3": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L4": {"active": true, "families": ["Брикет", "Пломбир", "Стаканчик"], "production_hours": 166.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P500", "qty": 79739, "hours": 39.87}, {"sku_id": "P1000", "qty": 30568, "hours": 25.47}, {"sku_id": "P5L", "qty": 4865, "hours": 12.16}, {"sku_id": "C_VAN", "qty": 6344, "hours": 6.34}, {"sku_id": "C_CHOC", "qty": 53807, "hours": 56.64}, {"sku_id": "B_CREME", "qty": 40819, "hours": 25.51}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 25000, "C_CHOC": 17500, "C_CREME": 37355, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 3708, "V5_CHOC": 2461}, "materials": {"milk": {"purchase": 84083, "inventory": 30815, "usage": 90466}, "cream": {"purchase": 21490, "inventory": 0, "usage": 21490}, "sugar": {"purchase": 27612, "inventory": 0, "usage": 27612}, "cocoa": {"purchase": 1306, "inventory": 0, "usage": 1306}, "packaging": {"purchase": 348332, "inventory": 0, "usage": 348332}}}, {"week": 11, "week_start": "2026-07-13", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 60.06, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.5005, "items": [{"sku_id": "B_CREME", "qty": 40819, "hours": 34.02}, {"sku_id": "B_PLOM", "qty": 31255, "hours": 26.05}]}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 118.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 72066, "hours": 72.07}, {"sku_id": "E_VAN", "qty": 22737, "hours": 22.74}, {"sku_id": "C_VAN", "qty": 22628, "hours": 18.86}, {"sku_id": "C_CREME", "qty": 4340, "hours": 4.34}]}, "L3": {"active": true, "families": ["Эскимо"], "production_hours": 2.97, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0247, "items": [{"sku_id": "E_VAN", "qty": 1483, "hours": 2.97}]}, "L4": {"active": true, "families": ["Пломбир", "Стаканчик"], "production_hours": 191.0, "changeover_hours": 1.0, "overtime_hours": 24.0, "utilization": 1.1429, "items": [{"sku_id": "P500", "qty": 79739, "hours": 39.87}, {"sku_id": "P1000", "qty": 30568, "hours": 25.47}, {"sku_id": "P5L", "qty": 4865, "hours": 12.16}, {"sku_id": "C_VAN", "qty": 56856, "hours": 56.86}, {"sku_id": "C_CHOC", "qty": 53807, "hours": 56.64}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 33143, "E_VAN": 7500, "C_VAN": 25000, "C_CHOC": 17500, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 3708, "V5_CHOC": 2461}, "materials": {"milk": {"purchase": 84083, "inventory": 14598, "usage": 100300}, "cream": {"purchase": 23675, "inventory": 0, "usage": 23675}, "sugar": {"purchase": 30526, "inventory": 0, "usage": 30526}, "cocoa": {"purchase": 2474, "inventory": 0, "usage": 2474}, "packaging": {"purchase": 421163, "inventory": 0, "usage": 421163}}}, {"week": 12, "week_start": "2026-07-20", "lines": {"L1": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}, "L2": {"active": true, "families": ["Стаканчик"], "production_hours": 109.32, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.911, "items": [{"sku_id": "C_VAN", "qty": 79484, "hours": 66.24}, {"sku_id": "C_CHOC", "qty": 12531, "hours": 11.39}, {"sku_id": "C_CREME", "qty": 31695, "hours": 31.7}]}, "L3": {"active": true, "families": ["Эскимо"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "E_CHOC", "qty": 35780, "hours": 71.56}, {"sku_id": "E_VAN", "qty": 24220, "hours": 48.44}]}, "L4": {"active": true, "families": ["Брикет", "Пломбир", "Стаканчик"], "production_hours": 166.0, "changeover_hours": 2.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P500", "qty": 79739, "hours": 39.87}, {"sku_id": "P1000", "qty": 30568, "hours": 25.47}, {"sku_id": "P5L", "qty": 4865, "hours": 12.16}, {"sku_id": "C_CHOC", "qty": 41276, "hours": 43.45}, {"sku_id": "B_CREME", "qty": 40819, "hours": 25.51}, {"sku_id": "B_PLOM", "qty": 31255, "hours": 19.53}]}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 25000, "C_CHOC": 17500, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 3708, "V5_CHOC": 2461}, "materials": {"milk": {"purchase": 84083, "inventory": 0, "usage": 98681}, "cream": {"purchase": 23407, "inventory": 0, "usage": 23407}, "sugar": {"purchase": 30168, "inventory": 0, "usage": 30168}, "cocoa": {"purchase": 1885, "inventory": 0, "usage": 1885}, "packaging": {"purchase": 412232, "inventory": 0, "usage": 412232}}}], "totals": {"production_cost": 139128089.45, "changeover_cost": 192300.0, "holding_cost": 1504026.83, "raw_purchase_cost": 175975842.42, "raw_holding_cost": 372673.44, "overtime_cost": 113273.1, "shortfall_penalty": 35416111.43, "objective_recomputed": 352702316.68, "total_shortfall": 35416, "total_production_hours": 3772.33, "total_changeover_hours": 38.5, "total_overtime_hours": 62.93}}, "demand": {"1": 307834, "2": 307834, "3": 307834, "4": 307834, "5": 372717, "6": 372717, "7": 372717, "8": 372717, "9": 372717, "10": 436544, "11": 436544, "12": 436544}, "sku_demand": {"B_CREME": {"1": 30285, "2": 30285, "3": 30285, "4": 30285, "5": 32063, "6": 32063, "7": 32063, "8": 32063, "9": 32063, "10": 40819, "11": 40819, "12": 40819}, "B_PLOM": {"1": 18890, "2": 18890, "3": 18890, "4": 18890, "5": 26648, "6": 26648, "7": 26648, "8": 26648, "9": 26648, "10": 31255, "11": 31255, "12": 31255}, "C_CHOC": {"1": 43365, "2": 43365, "3": 43365, "4": 43365, "5": 50664, "6": 50664, "7": 50664, "8": 50664, "9": 50664, "10": 53807, "11": 53807, "12": 53807}, "C_CREME": {"1": 23469, "2": 23469, "3": 23469, "4": 23469, "5": 26673, "6": 26673, "7": 26673, "8": 26673, "9": 26673, "10": 31695, "11": 31695, "12": 31695}, "C_VAN": {"1": 56071, "2": 56071, "3": 56071, "4": 56071, "5": 70503, "6": 70503, "7": 70503, "8": 70503, "9": 70503, "10": 79484, "11": 79484, "12": 79484}, "E_CHOC": {"1": 36175, "2": 36175, "3": 36175, "4": 36175, "5": 43918, "6": 43918, "7": 43918, "8": 43918, "9": 43918, "10": 53923, "11": 53923, "12": 53923}, "E_VAN": {"1": 17049, "2": 17049, "3": 17049, "4": 17049, "5": 20292, "6": 20292, "7": 20292, "8": 20292, "9": 20292, "10": 24220, "11": 24220, "12": 24220}, "P1000": {"1": 23036, "2": 23036, "3": 23036, "4": 23036, "5": 29306, "6": 29306, "7": 29306, "8": 29306, "9": 29306, "10": 30568, "11": 30568, "12": 30568}, "P500": {"1": 51647, "2": 51647, "3": 51647, "4": 51647, "5": 62732, "6": 62732, "7": 62732, "8": 62732, "9": 62732, "10": 79739, "11": 79739, "12": 79739}, "P5L": {"1": 3412, "2": 3412, "3": 3412, "4": 3412, "5": 4483, "6": 4483, "7": 4483, "8": 4483, "9": 4483, "10": 4865, "11": 4865, "12": 4865}, "V5_CHOC": {"1": 1639, "2": 1639, "3": 1639, "4": 1639, "5": 2162, "6": 2162, "7": 2162, "8": 2162, "9": 2162, "10": 2461, "11": 2461, "12": 2461}, "V5_PLOM": {"1": 2796, "2": 2796, "3": 2796, "4": 2796, "5": 3273, "6": 3273, "7": 3273, "8": 3273, "9": 3273, "10": 3708, "11": 3708, "12": 3708}}, "supply": {"cocoa": 2632, "cream": 28335, "milk": 84083, "packaging": 422675, "sugar": 36358}}, "breakdown": {"id": "breakdown", "name": "Поломка линии 4", "demand_mult": 1.0, "line_down": "L4", "plan": {"scenario": {"id": "breakdown", "name": "Поломка линии 4", "demand_mult": 1.0, "supply_mult": {"milk": 1.0, "cream": 1.0, "sugar": 1.0, "cocoa": 1.0, "packaging": 1.0}, "line_down": "L4"}, "solver": {"status": 0, "message": "Optimization terminated successfully. (HiGHS Status 7: Optimal)", "objective": 358817968.15, "mip_gap": 0.009094, "mip_node_count": 4612, "solve_time_s": 46.76}, "weeks": [{"week": 1, "week_start": "2026-05-04", "lines": {"L1": {"active": true, "families": ["Ведро", "Пломбир"], "production_hours": 137.5, "changeover_hours": 2.5, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "P500", "qty": 88117, "hours": 58.74}, {"sku_id": "P1000", "qty": 36072, "hours": 40.08}, {"sku_id": "V5_PLOM", "qty": 7138, "hours": 23.79}, {"sku_id": "V5_CHOC", "qty": 4167, "hours": 14.88}]}, "L2": {"active": true, "families": ["Стаканчик"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "C_VAN", "qty": 123621, "hours": 103.02}, {"sku_id": "C_CHOC", "qty": 25865, "hours": 23.51}, {"sku_id": "C_CREME", "qty": 13469, "hours": 13.47}]}, "L3": {"active": true, "families": ["Брикет", "Эскимо"], "production_hours": 138.5, "changeover_hours": 1.5, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "E_CHOC", "qty": 21175, "hours": 42.35}, {"sku_id": "E_VAN", "qty": 9549, "hours": 19.1}, {"sku_id": "B_CREME", "qty": 17785, "hours": 29.64}, {"sku_id": "B_PLOM", "qty": 28446, "hours": 47.41}]}, "L4": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}}, "inventory": {"P500": 81470, "P1000": 33036, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 117550, "C_CHOC": 17500, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 27556, "V5_PLOM": 6842, "V5_CHOC": 4028}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 1912, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 45879, "inventory": 0, "usage": 121189}, "cream": {"purchase": 10550, "inventory": 0, "usage": 28315}, "sugar": {"purchase": 13385, "inventory": 0, "usage": 36180}, "cocoa": {"purchase": 535, "inventory": 384, "usage": 1801}, "packaging": {"purchase": 110404, "inventory": 0, "usage": 375404}}}, {"week": 2, "week_start": "2026-05-11", "lines": {"L1": {"active": true, "families": ["Брикет"], "production_hours": 102.43, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.8536, "items": [{"sku_id": "B_CREME", "qty": 122918, "hours": 102.43}]}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 138.0, "changeover_hours": 2.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "E_CHOC", "qty": 36175, "hours": 36.17}, {"sku_id": "E_VAN", "qty": 17049, "hours": 17.05}, {"sku_id": "C_CHOC", "qty": 88376, "hours": 80.34}, {"sku_id": "C_CREME", "qty": 4434, "hours": 4.43}]}, "L3": {"active": true, "families": ["Брикет", "Стаканчик"], "production_hours": 138.5, "changeover_hours": 1.5, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "C_VAN", "qty": 19592, "hours": 27.99}, {"sku_id": "C_CREME", "qty": 65973, "hours": 109.95}, {"sku_id": "B_PLOM", "qty": 334, "hours": 0.56}]}, "L4": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}}, "inventory": {"P500": 29823, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 81071, "C_CHOC": 62511, "C_CREME": 56938, "B_CREME": 105133, "B_PLOM": 9000, "V5_PLOM": 4046, "V5_CHOC": 2389}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 3412, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 39015, "inventory": 0, "usage": 39015}, "cream": {"purchase": 10106, "inventory": 0, "usage": 10106}, "sugar": {"purchase": 13654, "inventory": 0, "usage": 13654}, "cocoa": {"purchase": 2632, "inventory": 0, "usage": 3016}, "packaging": {"purchase": 354851, "inventory": 0, "usage": 354851}}}, {"week": 3, "week_start": "2026-05-18", "lines": {"L1": {"active": true, "families": ["Пломбир"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "P500", "qty": 133213, "hours": 88.81}, {"sku_id": "P1000", "qty": 46072, "hours": 51.19}]}, "L2": {"active": true, "families": ["Эскимо"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "E_CHOC", "qty": 74442, "hours": 74.44}, {"sku_id": "E_VAN", "qty": 65558, "hours": 65.56}]}, "L3": {"active": true, "families": ["Брикет", "Пломбир"], "production_hours": 122.2, "changeover_hours": 1.5, "overtime_hours": 3.7, "utilization": 1.0308, "items": [{"sku_id": "P500", "qty": 10372, "hours": 14.82}, {"sku_id": "B_PLOM", "qty": 64428, "hours": 107.38}]}, "L4": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}}, "inventory": {"P500": 121761, "P1000": 33036, "P5L": 1500, "E_CHOC": 53267, "E_VAN": 56009, "C_VAN": 25000, "C_CHOC": 19146, "C_CREME": 33469, "B_CREME": 74848, "B_PLOM": 54538, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 3412, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 107037, "inventory": 0, "usage": 107037}, "cream": {"purchase": 24991, "inventory": 0, "usage": 24991}, "sugar": {"purchase": 31750, "inventory": 0, "usage": 31750}, "cocoa": {"purchase": 1489, "inventory": 0, "usage": 1489}, "packaging": {"purchase": 394085, "inventory": 0, "usage": 394085}}}, {"week": 4, "week_start": "2026-05-25", "lines": {"L1": {"active": true, "families": ["Ведро", "Пломбир"], "production_hours": 137.5, "changeover_hours": 2.5, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "P500", "qty": 135071, "hours": 90.05}, {"sku_id": "P5L", "qty": 3412, "hours": 13.65}, {"sku_id": "V5_PLOM", "qty": 6069, "hours": 20.23}, {"sku_id": "V5_CHOC", "qty": 3801, "hours": 13.57}]}, "L2": {"active": true, "families": ["Стаканчик"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "C_VAN", "qty": 122488, "hours": 102.07}, {"sku_id": "C_CHOC", "qty": 41719, "hours": 37.93}]}, "L3": {"active": true, "families": ["Эскимо"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "E_VAN", "qty": 70000, "hours": 140.0}]}, "L4": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}}, "inventory": {"P500": 205184, "P1000": 10000, "P5L": 1500, "E_CHOC": 17092, "E_VAN": 108960, "C_VAN": 91417, "C_CHOC": 17500, "C_CREME": 10000, "B_CREME": 44563, "B_PLOM": 35648, "V5_PLOM": 4523, "V5_CHOC": 2912}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 118582, "inventory": 0, "usage": 118582}, "cream": {"purchase": 27636, "inventory": 0, "usage": 27636}, "sugar": {"purchase": 35336, "inventory": 0, "usage": 35336}, "cocoa": {"purchase": 2483, "inventory": 1097, "usage": 1386}, "packaging": {"purchase": 382560, "inventory": 0, "usage": 382560}}}, {"week": 5, "week_start": "2026-06-01", "lines": {"L1": {"active": true, "families": ["Пломбир"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "P500", "qty": 58517, "hours": 39.01}, {"sku_id": "P1000", "qty": 58612, "hours": 65.12}, {"sku_id": "P5L", "qty": 8966, "hours": 35.86}]}, "L2": {"active": true, "families": ["Эскимо"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "E_CHOC", "qty": 140000, "hours": 140.0}]}, "L3": {"active": true, "families": ["Стаканчик"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "C_VAN", "qty": 4086, "hours": 5.84}, {"sku_id": "C_CHOC", "qty": 50664, "hours": 77.94}, {"sku_id": "C_CREME", "qty": 33731, "hours": 56.22}]}, "L4": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}}, "inventory": {"P500": 200970, "P1000": 39306, "P5L": 5983, "E_CHOC": 113174, "E_VAN": 88668, "C_VAN": 25000, "C_CHOC": 17500, "C_CREME": 17058, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 118539, "inventory": 0, "usage": 118539}, "cream": {"purchase": 27813, "inventory": 0, "usage": 27813}, "sugar": {"purchase": 35406, "inventory": 0, "usage": 35406}, "cocoa": {"purchase": 2632, "inventory": 0, "usage": 3729}, "packaging": {"purchase": 354576, "inventory": 0, "usage": 354576}}}, {"week": 6, "week_start": "2026-06-08", "lines": {"L1": {"active": true, "families": ["Брикет", "Ведро"], "production_hours": 135.11, "changeover_hours": 2.5, "overtime_hours": 17.61, "utilization": 1.1468, "items": [{"sku_id": "B_CREME", "qty": 64126, "hours": 53.44}, {"sku_id": "B_PLOM", "qty": 53296, "hours": 44.41}, {"sku_id": "V5_PLOM", "qty": 6546, "hours": 21.82}, {"sku_id": "V5_CHOC", "qty": 4324, "hours": 15.44}]}, "L2": {"active": true, "families": ["Стаканчик"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "C_VAN", "qty": 93340, "hours": 77.78}, {"sku_id": "C_CHOC", "qty": 68438, "hours": 62.22}]}, "L3": {"active": true, "families": ["Стаканчик"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "C_CREME", "qty": 84000, "hours": 140.0}]}, "L4": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}}, "inventory": {"P500": 138238, "P1000": 10000, "P5L": 1500, "E_CHOC": 69256, "E_VAN": 68376, "C_VAN": 47837, "C_CHOC": 35274, "C_CREME": 74385, "B_CREME": 44563, "B_PLOM": 35648, "V5_PLOM": 4523, "V5_CHOC": 2912}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 76713, "inventory": 0, "usage": 76713}, "cream": {"purchase": 18783, "inventory": 0, "usage": 18783}, "sugar": {"purchase": 24589, "inventory": 0, "usage": 24589}, "cocoa": {"purchase": 2632, "inventory": 0, "usage": 2632}, "packaging": {"purchase": 374070, "inventory": 0, "usage": 374070}}}, {"week": 7, "week_start": "2026-06-15", "lines": {"L1": {"active": true, "families": ["Пломбир"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "P500", "qty": 72458, "hours": 48.31}, {"sku_id": "P1000", "qty": 58612, "hours": 65.12}, {"sku_id": "P5L", "qty": 6643, "hours": 26.57}]}, "L2": {"active": true, "families": ["Стаканчик"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "C_VAN", "qty": 68036, "hours": 56.7}, {"sku_id": "C_CHOC", "qty": 91634, "hours": 83.3}]}, "L3": {"active": true, "families": ["Стаканчик"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "C_CHOC", "qty": 5391, "hours": 8.29}, {"sku_id": "C_CREME", "qty": 79024, "hours": 131.71}]}, "L4": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}}, "inventory": {"P500": 147964, "P1000": 39306, "P5L": 3660, "E_CHOC": 25338, "E_VAN": 48084, "C_VAN": 45370, "C_CHOC": 81635, "C_CREME": 126736, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 114046, "inventory": 0, "usage": 114046}, "cream": {"purchase": 26986, "inventory": 0, "usage": 26986}, "sugar": {"purchase": 34549, "inventory": 0, "usage": 34549}, "cocoa": {"purchase": 1850, "inventory": 0, "usage": 1850}, "packaging": {"purchase": 381797, "inventory": 0, "usage": 381797}}}, {"week": 8, "week_start": "2026-06-22", "lines": {"L1": {"active": true, "families": ["Брикет", "Ведро"], "production_hours": 124.76, "changeover_hours": 2.5, "overtime_hours": 7.26, "utilization": 1.0605, "items": [{"sku_id": "B_CREME", "qty": 74054, "hours": 61.71}, {"sku_id": "B_PLOM", "qty": 53296, "hours": 44.41}, {"sku_id": "V5_PLOM", "qty": 3273, "hours": 10.91}, {"sku_id": "V5_CHOC", "qty": 2162, "hours": 7.72}]}, "L2": {"active": true, "families": ["Стаканчик", "Эскимо"], "production_hours": 138.0, "changeover_hours": 2.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "E_CHOC", "qty": 14702, "hours": 14.7}, {"sku_id": "C_VAN", "qty": 147957, "hours": 123.3}]}, "L3": {"active": true, "families": ["Пломбир", "Эскимо"], "production_hours": 138.5, "changeover_hours": 1.5, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "P5L", "qty": 2323, "hours": 12.91}, {"sku_id": "E_CHOC", "qty": 62796, "hours": 125.59}]}, "L4": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}}, "inventory": {"P500": 85232, "P1000": 10000, "P5L": 1500, "E_CHOC": 58918, "E_VAN": 27792, "C_VAN": 122825, "C_CHOC": 30971, "C_CREME": 100063, "B_CREME": 54491, "B_PLOM": 35648, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 66532, "inventory": 0, "usage": 66532}, "cream": {"purchase": 16051, "inventory": 0, "usage": 16051}, "sugar": {"purchase": 21131, "inventory": 0, "usage": 21131}, "cocoa": {"purchase": 2353, "inventory": 0, "usage": 2353}, "packaging": {"purchase": 360564, "inventory": 0, "usage": 360564}}}, {"week": 9, "week_start": "2026-06-29", "lines": {"L1": {"active": true, "families": ["Ведро", "Пломбир"], "production_hours": 117.5, "changeover_hours": 2.5, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "P1000", "qty": 53809, "hours": 59.79}, {"sku_id": "P5L", "qty": 4483, "hours": 17.93}, {"sku_id": "V5_PLOM", "qty": 6981, "hours": 23.27}, {"sku_id": "V5_CHOC", "qty": 4623, "hours": 16.51}]}, "L2": {"active": true, "families": ["Стаканчик"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "C_VAN", "qty": 168000, "hours": 140.0}]}, "L3": {"active": true, "families": ["Стаканчик"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "C_CHOC", "qty": 91000, "hours": 140.0}]}, "L4": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}}, "inventory": {"P500": 22500, "P1000": 34503, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 220322, "C_CHOC": 71307, "C_CREME": 73390, "B_CREME": 22428, "B_PLOM": 9000, "V5_PLOM": 4958, "V5_CHOC": 3211}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 119870, "inventory": 0, "usage": 119870}, "cream": {"purchase": 27954, "inventory": 0, "usage": 27954}, "sugar": {"purchase": 35914, "inventory": 0, "usage": 35914}, "cocoa": {"purchase": 2290, "inventory": 0, "usage": 2290}, "packaging": {"purchase": 328896, "inventory": 0, "usage": 328896}}}, {"week": 10, "week_start": "2026-07-06", "lines": {"L1": {"active": true, "families": ["Брикет", "Пломбир"], "production_hours": 137.5, "changeover_hours": 2.5, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "P500", "qty": 79738, "hours": 53.16}, {"sku_id": "P1000", "qty": 6065, "hours": 6.74}, {"sku_id": "P5L", "qty": 4865, "hours": 19.46}, {"sku_id": "B_CREME", "qty": 69770, "hours": 58.14}]}, "L2": {"active": true, "families": ["Пломбир", "Эскимо"], "production_hours": 132.07, "changeover_hours": 2.0, "overtime_hours": 14.07, "utilization": 1.1172, "items": [{"sku_id": "P500", "qty": 1, "hours": 0.0}, {"sku_id": "E_CHOC", "qty": 107846, "hours": 107.85}, {"sku_id": "E_VAN", "qty": 24220, "hours": 24.22}]}, "L3": {"active": true, "families": ["Брикет"], "production_hours": 120.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 1.0, "items": [{"sku_id": "B_CREME", "qty": 1940, "hours": 3.23}, {"sku_id": "B_PLOM", "qty": 70060, "hours": 116.77}]}, "L4": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 68923, "E_VAN": 7500, "C_VAN": 140838, "C_CHOC": 17500, "C_CREME": 41695, "B_CREME": 53319, "B_PLOM": 47805, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 82042, "inventory": 0, "usage": 82042}, "cream": {"purchase": 19457, "inventory": 0, "usage": 19457}, "sugar": {"purchase": 25005, "inventory": 0, "usage": 25005}, "cocoa": {"purchase": 2515, "inventory": 0, "usage": 2515}, "packaging": {"purchase": 364506, "inventory": 0, "usage": 364506}}}, {"week": 11, "week_start": "2026-07-13", "lines": {"L1": {"active": true, "families": ["Брикет", "Ведро", "Пломбир"], "production_hours": 135.0, "changeover_hours": 5.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "P500", "qty": 79739, "hours": 53.16}, {"sku_id": "P1000", "qty": 30568, "hours": 33.96}, {"sku_id": "P5L", "qty": 4865, "hours": 19.46}, {"sku_id": "B_PLOM", "qty": 8720, "hours": 7.27}, {"sku_id": "V5_PLOM", "qty": 3708, "hours": 12.36}, {"sku_id": "V5_CHOC", "qty": 2461, "hours": 8.79}]}, "L2": {"active": true, "families": ["Эскимо"], "production_hours": 48.44, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.4037, "items": [{"sku_id": "E_VAN", "qty": 48440, "hours": 48.44}]}, "L3": {"active": true, "families": ["Стаканчик"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "C_VAN", "qty": 32276, "hours": 46.11}, {"sku_id": "C_CHOC", "qty": 61029, "hours": 93.89}]}, "L4": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 31720, "C_VAN": 93630, "C_CHOC": 24722, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 25271, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 104115, "inventory": 0, "usage": 104115}, "cream": {"purchase": 24145, "inventory": 0, "usage": 24145}, "sugar": {"purchase": 30674, "inventory": 0, "usage": 30674}, "cocoa": {"purchase": 1408, "inventory": 0, "usage": 1408}, "packaging": {"purchase": 271807, "inventory": 0, "usage": 271807}}}, {"week": 12, "week_start": "2026-07-20", "lines": {"L1": {"active": true, "families": ["Брикет", "Ведро", "Пломбир"], "production_hours": 135.0, "changeover_hours": 5.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "P500", "qty": 20885, "hours": 13.92}, {"sku_id": "P1000", "qty": 30568, "hours": 33.96}, {"sku_id": "P5L", "qty": 4865, "hours": 19.46}, {"sku_id": "B_CREME", "qty": 40819, "hours": 34.02}, {"sku_id": "B_PLOM", "qty": 14984, "hours": 12.49}, {"sku_id": "V5_PLOM", "qty": 3708, "hours": 12.36}, {"sku_id": "V5_CHOC", "qty": 2461, "hours": 8.79}]}, "L2": {"active": true, "families": ["Пломбир", "Эскимо"], "production_hours": 138.0, "changeover_hours": 2.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "P500", "qty": 58854, "hours": 84.08}, {"sku_id": "E_CHOC", "qty": 53923, "hours": 53.92}]}, "L3": {"active": true, "families": ["Стаканчик"], "production_hours": 140.0, "changeover_hours": 0.0, "overtime_hours": 20.0, "utilization": 1.1667, "items": [{"sku_id": "C_VAN", "qty": 10854, "hours": 15.51}, {"sku_id": "C_CHOC", "qty": 46585, "hours": 71.67}, {"sku_id": "C_CREME", "qty": 31695, "hours": 52.83}]}, "L4": {"active": false, "families": [], "production_hours": 0.0, "changeover_hours": 0.0, "overtime_hours": 0.0, "utilization": 0.0, "items": []}}, "inventory": {"P500": 22500, "P1000": 10000, "P5L": 1500, "E_CHOC": 15000, "E_VAN": 7500, "C_VAN": 25000, "C_CHOC": 17500, "C_CREME": 10000, "B_CREME": 12500, "B_PLOM": 9000, "V5_PLOM": 1250, "V5_CHOC": 750}, "shortfall": {"P500": 0, "P1000": 0, "P5L": 0, "E_CHOC": 0, "E_VAN": 0, "C_VAN": 0, "C_CHOC": 0, "C_CREME": 0, "B_CREME": 0, "B_PLOM": 0, "V5_PLOM": 0, "V5_CHOC": 0}, "materials": {"milk": {"purchase": 110006, "inventory": 0, "usage": 110006}, "cream": {"purchase": 25776, "inventory": 0, "usage": 25776}, "sugar": {"purchase": 32789, "inventory": 0, "usage": 32789}, "cocoa": {"purchase": 2632, "inventory": 0, "usage": 2632}, "packaging": {"purchase": 320202, "inventory": 0, "usage": 320202}}}], "totals": {"production_cost": 153866290.87, "changeover_cost": 212400.0, "holding_cost": 2823591.02, "raw_purchase_cost": 192329440.7, "raw_holding_cost": 7401.92, "overtime_cost": 842843.64, "shortfall_penalty": 8736000.0, "objective_recomputed": 358817968.15, "total_shortfall": 8736, "total_production_hours": 4794.51, "total_changeover_hours": 39.0, "total_overtime_hours": 602.64}}, "demand": {"1": 307834, "2": 307834, "3": 307834, "4": 307834, "5": 372717, "6": 372717, "7": 372717, "8": 372717, "9": 372717, "10": 436544, "11": 436544, "12": 436544}, "sku_demand": {"B_CREME": {"1": 30285, "2": 30285, "3": 30285, "4": 30285, "5": 32063, "6": 32063, "7": 32063, "8": 32063, "9": 32063, "10": 40819, "11": 40819, "12": 40819}, "B_PLOM": {"1": 18890, "2": 18890, "3": 18890, "4": 18890, "5": 26648, "6": 26648, "7": 26648, "8": 26648, "9": 26648, "10": 31255, "11": 31255, "12": 31255}, "C_CHOC": {"1": 43365, "2": 43365, "3": 43365, "4": 43365, "5": 50664, "6": 50664, "7": 50664, "8": 50664, "9": 50664, "10": 53807, "11": 53807, "12": 53807}, "C_CREME": {"1": 23469, "2": 23469, "3": 23469, "4": 23469, "5": 26673, "6": 26673, "7": 26673, "8": 26673, "9": 26673, "10": 31695, "11": 31695, "12": 31695}, "C_VAN": {"1": 56071, "2": 56071, "3": 56071, "4": 56071, "5": 70503, "6": 70503, "7": 70503, "8": 70503, "9": 70503, "10": 79484, "11": 79484, "12": 79484}, "E_CHOC": {"1": 36175, "2": 36175, "3": 36175, "4": 36175, "5": 43918, "6": 43918, "7": 43918, "8": 43918, "9": 43918, "10": 53923, "11": 53923, "12": 53923}, "E_VAN": {"1": 17049, "2": 17049, "3": 17049, "4": 17049, "5": 20292, "6": 20292, "7": 20292, "8": 20292, "9": 20292, "10": 24220, "11": 24220, "12": 24220}, "P1000": {"1": 23036, "2": 23036, "3": 23036, "4": 23036, "5": 29306, "6": 29306, "7": 29306, "8": 29306, "9": 29306, "10": 30568, "11": 30568, "12": 30568}, "P500": {"1": 51647, "2": 51647, "3": 51647, "4": 51647, "5": 62732, "6": 62732, "7": 62732, "8": 62732, "9": 62732, "10": 79739, "11": 79739, "12": 79739}, "P5L": {"1": 3412, "2": 3412, "3": 3412, "4": 3412, "5": 4483, "6": 4483, "7": 4483, "8": 4483, "9": 4483, "10": 4865, "11": 4865, "12": 4865}, "V5_CHOC": {"1": 1639, "2": 1639, "3": 1639, "4": 1639, "5": 2162, "6": 2162, "7": 2162, "8": 2162, "9": 2162, "10": 2461, "11": 2461, "12": 2461}, "V5_PLOM": {"1": 2796, "2": 2796, "3": 2796, "4": 2796, "5": 3273, "6": 3273, "7": 3273, "8": 3273, "9": 3273, "10": 3708, "11": 3708, "12": 3708}}, "supply": {"cocoa": 2632, "cream": 28335, "milk": 120119, "packaging": 422675, "sugar": 36358}}}, "default_scenario": "base", "baseline": {"total_cost": 156100199.98, "total_shortfall": 0, "total_production_hours": 4292.75, "total_changeover_hours": 113.0, "total_overtime_hours": 225.08}};
+
+const FAMILY_COLORS = {
+  "Пломбир": "#2a78d6",
+  "Эскимо": "#e87ba4",
+  "Стаканчик": "#eda100",
+  "Брикет": "#1baf7a",
+  "Ведро": "#7a5af8"
+};
+const MONTHS = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
+
+const state = {
+  scenario: DATA.default_scenario,
+  sku: DATA.skus[0].id,
+  material: DATA.materials[0].id
+};
+
+const $ = (sel) => document.querySelector(sel);
+const clear = (node) => { while (node.firstChild) node.removeChild(node.firstChild); };
+const el = (tag, cls, html) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html !== undefined) e.innerHTML = html;
+  return e;
+};
+const fmt = (n, d = 0) => Number(n).toLocaleString("ru-RU", {
+  minimumFractionDigits: d, maximumFractionDigits: d
+});
+const pct = (x) => (x * 100).toFixed(1).replace(".", ",") + "%";
+const fmtMoney = (n) => {
+  if (Math.abs(n) >= 1e9) return (n / 1e9).toFixed(2).replace(".", ",") + " млрд ₽";
+  if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1).replace(".", ",") + " млн ₽";
+  if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(0) + " тыс. ₽";
+  return fmt(n) + " ₽";
+};
+const current = () => DATA.scenarios[state.scenario];
+const skuById = (id) => DATA.skus.find(x => x.id === id);
+const weekPlan = (s, week) => s.plan.weeks.find(x => x.week === week);
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+function svg(tag, attrs = {}) {
+  const e = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+}
+function text(x, y, str, cls = "axis-text", anchor = "middle") {
+  const t = svg("text", { x, y, class: cls, "text-anchor": anchor });
+  t.textContent = str;
+  return t;
+}
+function line(x1, y1, x2, y2, cls = "axis-line") {
+  return svg("line", { x1, y1, x2, y2, class: cls });
+}
+function bindTip(target, wrap, tip, html) {
+  target.addEventListener("mousemove", (e) => {
+    tip.innerHTML = html;
+    tip.style.opacity = 1;
+    const r = wrap.getBoundingClientRect();
+    tip.style.left = Math.min(e.clientX - r.left + 12, r.width - 190) + "px";
+    tip.style.top = Math.max(0, e.clientY - r.top - 12) + "px";
+  });
+  target.addEventListener("mouseleave", () => { tip.style.opacity = 0; });
+}
+function table(container, headers, rows) {
+  clear(container);
+  const t = el("table", "data-table");
+  const thead = el("thead");
+  const tr = el("tr");
+  for (const h of headers) tr.appendChild(el("th", "", h));
+  thead.appendChild(tr);
+  t.appendChild(thead);
+  const tbody = el("tbody");
+  for (const row of rows) {
+    const r = el("tr");
+    for (const cell of row) r.appendChild(el("td", "", cell));
+    tbody.appendChild(r);
+  }
+  t.appendChild(tbody);
+  container.appendChild(t);
+}
+function legendItem(label, color) {
+  const item = el("span", "legend-item");
+  item.innerHTML = `<span class="key" style="background:${color}"></span>${label}`;
+  return item;
+}
+function fillLegend(id, items) {
+  const root = $(id);
+  clear(root);
+  for (const [label, color] of items) root.appendChild(legendItem(label, color));
+}
+
+/* ---------- KPI ---------- */
+function renderKpis(s) {
+  const p = s.plan;
+  const demandTotal = Object.values(s.demand).reduce((a, b) => a + b, 0);
+  const shortfall = p.totals.total_shortfall;
+  const fulfillment = (demandTotal - shortfall) / demandTotal;
+  const activeAvg = p.weeks.reduce(
+    (sum, w) => sum + Object.values(w.lines).filter(l => l.active).length, 0
+  ) / p.weeks.length;
+  const capacity = DATA.lines.reduce((a, l) => a + l.hours, 0) * DATA.weeks.length;
+  const load = (p.totals.total_production_hours + p.totals.total_changeover_hours) / capacity;
+  const tiles = [
+    {
+      label: "Выполнение спроса",
+      value: pct(fulfillment),
+      foot: shortfall ? `дефицит ${fmt(shortfall)} шт` : "дефицита нет",
+      tone: shortfall ? "bad" : "good"
+    },
+    {
+      label: "Линий в работе",
+      value: activeAvg.toFixed(1).replace(".", ",") + " из " + DATA.lines.length,
+      foot: `загрузка ${pct(load)}`,
+      tone: ""
+    },
+    {
+      label: "Переналадки",
+      value: fmt(p.totals.total_changeover_hours, 1) + " ч",
+      foot: `переработка ${fmt(p.totals.total_overtime_hours, 1)} ч`,
+      tone: ""
+    },
+    {
+      label: "Затраты",
+      value: fmtMoney(p.solver.objective),
+      foot: `сырьё ${fmtMoney(p.totals.raw_purchase_cost)}`,
+      tone: ""
+    }
+  ];
+  const row = $("#kpis");
+  clear(row);
+  for (const t of tiles) {
+    const tile = el("div", "kpi-tile");
+    tile.innerHTML = `<div class="label">${t.label}</div>
+      <div class="value ${t.tone}">${t.value}</div>
+      <div class="foot">${t.foot}</div>`;
+    row.appendChild(tile);
+  }
+}
+
+/* ---------- Gantt ---------- */
+function renderGantt(s) {
+  const root = $("#gantt");
+  clear(root);
+  const head = el("div", "gantt-head");
+  head.appendChild(el("div", "gantt-label", ""));
+  for (const w of DATA.weeks) {
+    head.appendChild(el("div", "gantt-week", `Н${w.week}<span>${w.week_start.slice(5)}</span>`));
+  }
+  root.appendChild(head);
+
+  for (const line of DATA.lines) {
+    const row = el("div", "gantt-row");
+    const label = el("div", "gantt-label", line.id);
+    label.title = line.name;
+    row.appendChild(label);
+    for (const w of DATA.weeks) {
+      const ld = weekPlan(s, w.week).lines[line.id];
+      const cell = el("div", "gantt-cell");
+      const total = ld.production_hours + ld.changeover_hours;
+      const over = total > line.hours + 0.05;
+      if (over) cell.classList.add("over");
+      if (total > 0) {
+        const bar = el("div", "gantt-bar");
+        bar.style.width = Math.min(total / line.hours, 1) * 100 + "%";
+        const byFamily = {};
+        for (const item of ld.items) {
+          const fam = skuById(item.sku_id).family;
+          byFamily[fam] = (byFamily[fam] || 0) + item.hours;
+        }
+        for (const [fam, hours] of Object.entries(byFamily)) {
+          const seg = el("div", "gantt-seg");
+          seg.style.background = FAMILY_COLORS[fam] || "var(--ink-muted)";
+          seg.style.width = (hours / total) * 100 + "%";
+          bar.appendChild(seg);
+        }
+        if (ld.changeover_hours > 0) {
+          const seg = el("div", "gantt-seg change");
+          seg.style.width = (ld.changeover_hours / total) * 100 + "%";
+          bar.appendChild(seg);
+        }
+        cell.appendChild(bar);
+      }
+      const hoursLabel = total > 0
+        ? (ld.overtime_hours > 0
+            ? `${fmt(Math.max(0, total - ld.overtime_hours), 0)}+${fmt(ld.overtime_hours, 0)}`
+            : fmt(total, 0))
+        : "—";
+      cell.appendChild(el("div", "gantt-h", hoursLabel));
+      const items = ld.items
+        .map(it => `${it.sku_id}: ${fmt(it.qty)} шт / ${fmt(it.hours, 1)} ч`)
+        .join("\n");
+      cell.title = `${line.name}, неделя ${w.week}\n`
+        + `производство ${fmt(ld.production_hours, 1)} ч + переналадка ${fmt(ld.changeover_hours, 1)} ч`
+        + (ld.overtime_hours ? `\nпереработка ${fmt(ld.overtime_hours, 1)} ч` : "")
+        + (items ? `\n${items}` : "\nлиния не включена");
+      row.appendChild(cell);
+    }
+    root.appendChild(row);
+  }
+
+  const legend = $("#familyLegend");
+  clear(legend);
+  for (const fam of DATA.families) {
+    const item = el("span", "legend-item");
+    item.innerHTML = `<span class="chip" style="background:${FAMILY_COLORS[fam]}"></span>${fam}`;
+    legend.appendChild(item);
+  }
+  const ch = el("span", "legend-item");
+  ch.innerHTML = `<span class="chip" style="background:var(--baseline)"></span>переналадка`;
+  legend.appendChild(ch);
+
+  const rows = [];
+  for (const w of DATA.weeks) {
+    for (const line of DATA.lines) {
+      const ld = weekPlan(s, w.week).lines[line.id];
+      rows.push([
+        `Н${w.week}`, line.id,
+        fmt(ld.production_hours, 1), fmt(ld.changeover_hours, 1),
+        fmt(ld.overtime_hours, 1), pct(ld.utilization)
+      ]);
+    }
+  }
+  table($("#ganttTable"), ["Неделя", "Линия", "Производство, ч", "Переналадка, ч", "Переработка, ч", "Загрузка"], rows);
+}
+
+/* ---------- Load chart ---------- */
+function renderLoad(s) {
+  const wrap = $("#loadWrap");
+  const root = $("#loadSvg");
+  const tip = $("#loadTip");
+  clear(root);
+  fillLegend("#loadLegend", [
+    ["производство", "var(--blue)"],
+    ["переналадка", "var(--amber)"],
+    ["переработка", "var(--bad)"],
+    ["мощность", "var(--bad)"]
+  ]);
+  const W = 900, H = 320, m = { l: 48, r: 18, t: 18, b: 38 };
+  const weekly = DATA.weeks.map(w => {
+    const wp = weekPlan(s, w.week);
+    const prod = Object.values(wp.lines).reduce((a, l) => a + l.production_hours, 0);
+    const change = Object.values(wp.lines).reduce((a, l) => a + l.changeover_hours, 0);
+    const ot = Object.values(wp.lines).reduce((a, l) => a + l.overtime_hours, 0);
+    return { week: w.week, prod, change, ot, total: prod + change };
+  });
+  const capacity = DATA.lines.reduce((a, l) => a + l.hours, 0);
+  const maxY = Math.max(capacity, ...weekly.map(x => x.total + x.ot)) * 1.1;
+  const x = i => m.l + (i + 0.5) * (W - m.l - m.r) / weekly.length;
+  const y = v => H - m.b - (v / maxY) * (H - m.t - m.b);
+  const bw = (W - m.l - m.r) / weekly.length * 0.55;
+
+  for (let i = 0; i <= 4; i++) {
+    const v = maxY * i / 4;
+    root.appendChild(line(m.l, y(v), W - m.r, y(v), "grid-line"));
+    root.appendChild(text(m.l - 6, y(v) + 3, fmt(v, 0), "axis-text", "end"));
+  }
+  root.appendChild(line(m.l, y(0), W - m.r, y(0), "axis-line"));
+  root.appendChild(line(m.l, y(capacity), W - m.r, y(capacity), "capacity-line"));
+  root.appendChild(text(W - m.r - 4, y(capacity) - 4, "мощность " + fmt(capacity, 0) + " ч", "axis-text", "end"));
+
+  weekly.forEach((d, i) => {
+    const x0 = x(i) - bw / 2;
+    let base = y(0);
+    const parts = [
+      { v: d.prod, color: "var(--blue)", name: "производство" },
+      { v: d.change, color: "var(--amber)", name: "переналадка" },
+      { v: d.ot, color: "var(--bad)", name: "переработка" }
+    ];
+    for (const p of parts) {
+      if (p.v <= 0) continue;
+      const h = (p.v / maxY) * (H - m.t - m.b);
+      const r = svg("rect", {
+        x: x0, y: base - h, width: bw, height: h, fill: p.color, rx: 2
+      });
+      root.appendChild(r);
+      base -= h;
+    }
+    root.appendChild(text(x(i), H - m.b + 15, "Н" + d.week));
+    const hit = svg("rect", {
+      x: x(i) - bw / 2 - 3, y: m.t, width: bw + 6, height: H - m.t - m.b,
+      fill: "transparent", style: "cursor:pointer"
+    });
+    bindTip(hit, wrap, tip,
+      `<b>Неделя ${d.week}</b>\nпроизводство: ${fmt(d.prod, 1)} ч\n`
+      + `переналадка: ${fmt(d.change, 1)} ч\nпереработка: ${fmt(d.ot, 1)} ч\n`
+      + `итого: ${fmt(d.total + d.ot, 1)} ч`);
+    root.appendChild(hit);
+  });
+
+  table($("#loadTable"),
+    ["Неделя", "Производство, ч", "Переналадка, ч", "Переработка, ч", "Итого, ч"],
+    weekly.map(d => [
+      "Н" + d.week, fmt(d.prod, 1), fmt(d.change, 1), fmt(d.ot, 1), fmt(d.total + d.ot, 1)
+    ])
+  );
+}
+
+/* ---------- Line summary ---------- */
+function renderLineSummary(s) {
+  const rows = [];
+  for (const line of DATA.lines) {
+    let prod = 0, change = 0, ot = 0, active = 0;
+    for (const w of DATA.weeks) {
+      const ld = weekPlan(s, w.week).lines[line.id];
+      prod += ld.production_hours;
+      change += ld.changeover_hours;
+      ot += ld.overtime_hours;
+      if (ld.active) active += 1;
+    }
+    const util = (prod + change) / (line.hours * DATA.weeks.length);
+    rows.push([
+      line.id, fmt(prod, 0), fmt(change, 0), fmt(ot, 0),
+      pct(util), `${active}/${DATA.weeks.length}`
+    ]);
+  }
+  table($("#lineSummary"),
+    ["Линия", "Производство, ч", "Переналадки, ч", "Переработка, ч", "Загрузка", "Недель в работе"],
+    rows
+  );
+}
+
+/* ---------- Inventory ---------- */
+function renderInventory(s) {
+  const sku = skuById(state.sku);
+  const values = DATA.weeks.map(w => weekPlan(s, w.week).inventory[sku.id]);
+  const skuDemand = s.sku_demand[sku.id];
+  const avg = Object.values(skuDemand).reduce((a, b) => a + b, 0) / DATA.weeks.length;
+  const shelfLimit = sku.shelf * avg;
+  const maxY = Math.max(1, sku.safety, ...values) * 1.2;
+  const wrap = $("#invWrap");
+  const root = $("#invSvg");
+  const tip = $("#invTip");
+  clear(root);
+  fillLegend("#invLegend", [
+    ["склад", "var(--blue)"],
+    ["безопасный запас", "var(--bad)"],
+    ["лимит хранения", "var(--baseline)"]
+  ]);
+  const W = 900, H = 280, m = { l: 54, r: 18, t: 18, b: 36 };
+  const x = i => m.l + (i + 0.5) * (W - m.l - m.r) / values.length;
+  const y = v => H - m.b - (v / maxY) * (H - m.t - m.b);
+
+  for (let i = 0; i <= 4; i++) {
+    const v = maxY * i / 4;
+    root.appendChild(line(m.l, y(v), W - m.r, y(v), "grid-line"));
+    root.appendChild(text(m.l - 6, y(v) + 3, fmt(v, 0), "axis-text", "end"));
+  }
+  root.appendChild(line(m.l, y(0), W - m.r, y(0), "axis-line"));
+  root.appendChild(line(m.l, y(sku.safety), W - m.r, y(sku.safety), "capacity-line"));
+  root.appendChild(text(W - m.r - 4, y(sku.safety) - 4, "безопасный запас", "axis-text", "end"));
+  if (shelfLimit <= maxY) {
+    root.appendChild(line(m.l, y(shelfLimit), W - m.r, y(shelfLimit), "grid-line"));
+    root.appendChild(text(W - m.r - 4, y(shelfLimit) - 4, "лимит хранения", "axis-text", "end"));
+  } else {
+    root.appendChild(text(W - m.r - 4, m.t + 12,
+      "лимит хранения " + fmt(shelfLimit, 0) + " (выше шкалы)", "axis-text", "end"));
+  }
+
+  const pts = values.map((v, i) => [x(i), y(v)]);
+  const area = `M ${pts[0][0]} ${y(0)} ` + pts.map(p => `L ${p[0]} ${p[1]}`).join(" ") + ` L ${pts[pts.length - 1][0]} ${y(0)} Z`;
+  root.appendChild(svg("path", { d: area, fill: "var(--blue)", class: "series-area" }));
+  root.appendChild(svg("path", {
+    d: "M " + pts.map(p => p.join(" ")).join(" L "),
+    stroke: "var(--blue)", class: "series-line"
+  }));
+  values.forEach((v, i) => {
+    root.appendChild(text(x(i), H - m.b + 15, "Н" + (i + 1)));
+    const hit = svg("circle", {
+      cx: x(i), cy: y(v), r: 7, fill: "transparent", style: "cursor:pointer"
+    });
+    bindTip(hit, wrap, tip,
+      `<b>Неделя ${i + 1}</b>\n${sku.name}\nсклад: ${fmt(v)} шт\n`
+      + `безопасный запас: ${fmt(sku.safety)} шт\nлимит: ${fmt(shelfLimit, 0)} шт`);
+    root.appendChild(hit);
+    root.appendChild(svg("circle", { cx: x(i), cy: y(v), r: 2.5, fill: "var(--blue)" }));
+  });
+
+  table($("#invTable"),
+    ["Неделя", "Склад, шт", "Безопасный запас, шт", "Лимит, шт"],
+    values.map((v, i) => ["Н" + (i + 1), fmt(v), fmt(sku.safety), fmt(shelfLimit, 0)])
+  );
+}
+
+/* ---------- Materials ---------- */
+function renderMaterials(s) {
+  const mat = DATA.materials.find(x => x.id === state.material);
+  const rows = DATA.weeks.map(w => weekPlan(s, w.week).materials[mat.id]);
+  const supplyMax = s.supply[mat.id];
+  const maxY = Math.max(supplyMax, ...rows.map(r => Math.max(r.purchase, r.usage, r.inventory))) * 1.1;
+  const wrap = $("#matWrap");
+  const root = $("#matSvg");
+  const tip = $("#matTip");
+  clear(root);
+  fillLegend("#matLegend", [
+    ["закупка", "var(--blue)"],
+    ["расход", "var(--amber)"],
+    ["склад", "var(--teal)"],
+    ["поставка", "var(--bad)"]
+  ]);
+  const W = 900, H = 280, m = { l: 58, r: 18, t: 18, b: 36 };
+  const x = i => m.l + (i + 0.5) * (W - m.l - m.r) / rows.length;
+  const y = v => H - m.b - (v / maxY) * (H - m.t - m.b);
+  const bw = (W - m.l - m.r) / rows.length * 0.3;
+
+  for (let i = 0; i <= 4; i++) {
+    const v = maxY * i / 4;
+    root.appendChild(line(m.l, y(v), W - m.r, y(v), "grid-line"));
+    root.appendChild(text(m.l - 6, y(v) + 3, fmt(v, 0), "axis-text", "end"));
+  }
+  root.appendChild(line(m.l, y(0), W - m.r, y(0), "axis-line"));
+  root.appendChild(line(m.l, y(supplyMax), W - m.r, y(supplyMax), "capacity-line"));
+  root.appendChild(text(W - m.r - 4, y(supplyMax) - 4, "поставка " + fmt(supplyMax, 0), "axis-text", "end"));
+
+  rows.forEach((r, i) => {
+    const x0 = x(i);
+    const h1 = (r.purchase / maxY) * (H - m.t - m.b);
+    const h2 = (r.usage / maxY) * (H - m.t - m.b);
+    root.appendChild(svg("rect", {
+      x: x0 - bw - 1, y: y(0) - h1, width: bw, height: h1, fill: "var(--blue)", rx: 2
+    }));
+    root.appendChild(svg("rect", {
+      x: x0 + 1, y: y(0) - h2, width: bw, height: h2, fill: "var(--amber)", rx: 2
+    }));
+    root.appendChild(text(x(i), H - m.b + 15, "Н" + (i + 1)));
+    const hit = svg("rect", {
+      x: x(i) - bw - 3, y: m.t, width: 2 * bw + 6, height: H - m.t - m.b,
+      fill: "transparent", style: "cursor:pointer"
+    });
+    bindTip(hit, wrap, tip,
+      `<b>Неделя ${i + 1}</b>\n${mat.name}\nзакупка: ${fmt(r.purchase)} ${mat.unit}\n`
+      + `расход: ${fmt(r.usage)} ${mat.unit}\nсклад: ${fmt(r.inventory)} ${mat.unit}\n`
+      + `поставка: ${fmt(supplyMax)} ${mat.unit}`);
+    root.appendChild(hit);
+  });
+
+  const pts = rows.map((r, i) => [x(i), y(r.inventory)]);
+  root.appendChild(svg("path", {
+    d: "M " + pts.map(p => p.join(" ")).join(" L "),
+    stroke: "var(--teal)", class: "series-line"
+  }));
+
+  table($("#matTable"),
+    ["Неделя", "Закупка", "Расход", "Склад", "Поставка"],
+    rows.map((r, i) => [
+      "Н" + (i + 1), fmt(r.purchase), fmt(r.usage), fmt(r.inventory), fmt(supplyMax)
+    ])
+  );
+}
+
+/* ---------- Seasonality ---------- */
+function renderSeasonality(s) {
+  const hist = DATA.history.slice(-12);
+  const byMonth = {};
+  for (const w of DATA.weeks) {
+    byMonth[w.month] = (byMonth[w.month] || 0) + s.demand[w.week];
+  }
+  const forecast = Object.entries(byMonth).map(([month, demand]) => ({ month, demand }));
+  const all = [
+    ...hist.map(x => ({ label: x.month.slice(2), demand: x.demand, kind: "hist" })),
+    ...forecast.map(x => ({ label: x.month.slice(2), demand: x.demand, kind: "forecast" }))
+  ];
+  const maxY = Math.max(...all.map(x => x.demand)) * 1.1;
+  const wrap = $("#seasonWrap");
+  const root = $("#seasonSvg");
+  const tip = $("#seasonTip");
+  clear(root);
+  fillLegend("#seasonLegend", [
+    ["история", "var(--blue)"],
+    ["прогноз", "var(--amber)"]
+  ]);
+  const W = 900, H = 280, m = { l: 58, r: 18, t: 18, b: 36 };
+  const x = i => m.l + (i + 0.5) * (W - m.l - m.r) / all.length;
+  const y = v => H - m.b - (v / maxY) * (H - m.t - m.b);
+  const bw = (W - m.l - m.r) / all.length * 0.6;
+
+  for (let i = 0; i <= 4; i++) {
+    const v = maxY * i / 4;
+    root.appendChild(line(m.l, y(v), W - m.r, y(v), "grid-line"));
+    root.appendChild(text(m.l - 6, y(v) + 3, fmt(v / 1000, 0) + "к", "axis-text", "end"));
+  }
+  root.appendChild(line(m.l, y(0), W - m.r, y(0), "axis-line"));
+
+  all.forEach((d, i) => {
+    const h = (d.demand / maxY) * (H - m.t - m.b);
+    root.appendChild(svg("rect", {
+      x: x(i) - bw / 2, y: y(0) - h, width: bw, height: h,
+      fill: d.kind === "forecast" ? "var(--amber)" : "var(--blue)", rx: 2
+    }));
+    if (i % 2 === 0 || d.kind === "forecast") {
+      root.appendChild(text(x(i), H - m.b + 15, d.label, "axis-text", "middle"));
+    }
+    const hit = svg("rect", {
+      x: x(i) - bw / 2 - 2, y: m.t, width: bw + 4, height: H - m.t - m.b,
+      fill: "transparent", style: "cursor:pointer"
+    });
+    bindTip(hit, wrap, tip,
+      `<b>${d.label}</b>\n${d.kind === "forecast" ? "прогноз" : "история"}: `
+      + `${fmt(d.demand)} шт`);
+    root.appendChild(hit);
+  });
+
+  const indexRoot = $("#indexSvg");
+  const indexTip = $("#indexTip");
+  clear(indexRoot);
+  const idx = DATA.seasonality;
+  const maxIdx = Math.max(...idx.map(x => x.index)) * 1.15;
+  const ix = i => m.l + (i + 0.5) * (W - m.l - m.r) / idx.length;
+  const iy = v => H - m.b - (v / maxIdx) * (H - m.t - m.b);
+  for (let i = 0; i <= 4; i++) {
+    const v = maxIdx * i / 4;
+    indexRoot.appendChild(line(m.l, iy(v), W - m.r, iy(v), "grid-line"));
+    indexRoot.appendChild(text(m.l - 6, iy(v) + 3, v.toFixed(2).replace(".", ","), "axis-text", "end"));
+  }
+  indexRoot.appendChild(line(m.l, iy(0), W - m.r, iy(0), "axis-line"));
+  idx.forEach((d, i) => {
+    const h = (d.index / maxIdx) * (H - m.t - m.b);
+    const hot = [5, 6, 7].includes(d.month);
+    indexRoot.appendChild(svg("rect", {
+      x: ix(i) - bw / 2, y: iy(0) - h, width: bw, height: h,
+      fill: hot ? "var(--amber)" : "var(--blue)", rx: 2
+    }));
+    indexRoot.appendChild(text(ix(i), H - m.b + 15, MONTHS[d.month - 1]));
+    const hit = svg("rect", {
+      x: ix(i) - bw / 2 - 2, y: m.t, width: bw + 4, height: H - m.t - m.b,
+      fill: "transparent", style: "cursor:pointer"
+    });
+    bindTip(hit, $("#indexWrap"), indexTip,
+      `<b>${MONTHS[d.month - 1]}</b>\nиндекс: ${d.index.toFixed(2).replace(".", ",")}`);
+    indexRoot.appendChild(hit);
+  });
+
+  table($("#seasonTable"),
+    ["Период", "Спрос, шт", "Тип"],
+    all.map(x => [x.label, fmt(x.demand), x.kind === "forecast" ? "прогноз" : "история"])
+  );
+}
+
+/* ---------- Costs ---------- */
+function renderCosts(s) {
+  const t = s.plan.totals;
+  const rows = [
+    ["Производство", t.production_cost, "var(--blue)"],
+    ["Сырьё", t.raw_purchase_cost, "var(--teal)"],
+    ["Склад SKU", t.holding_cost, "var(--amber)"],
+    ["Склад сырья", t.raw_holding_cost, "var(--pink)"],
+    ["Переналадки", t.changeover_cost, "var(--violet)"],
+    ["Переработка", t.overtime_cost, "var(--bad)"],
+    ["Дефицит", t.shortfall_penalty, "var(--bad)"]
+  ];
+  const total = rows.reduce((a, r) => a + r[1], 0);
+  const root = $("#costs");
+  clear(root);
+  const bar = el("div", "cost-bar");
+  for (const [name, value, color] of rows) {
+    if (value <= 0) continue;
+    const seg = el("div");
+    seg.style.width = (value / total) * 100 + "%";
+    seg.style.background = color;
+    seg.title = `${name}: ${fmtMoney(value)}`;
+    bar.appendChild(seg);
+  }
+  root.appendChild(bar);
+  const tableEl = el("table", "cost-table");
+  for (const [name, value] of rows) {
+    const tr = el("tr");
+    tr.innerHTML = `<td>${name}</td><td>${fmtMoney(value)}</td>`;
+    tableEl.appendChild(tr);
+  }
+  const tr = el("tr");
+  tr.innerHTML = `<td>Итого</td><td>${fmtMoney(total)}</td>`;
+  tableEl.appendChild(tr);
+  root.appendChild(tableEl);
+
+  if (s.id === "base" && DATA.baseline) {
+    const comparable = t.production_cost + t.changeover_cost
+      + t.overtime_cost + t.shortfall_penalty;
+    const diff = comparable - DATA.baseline.total_cost;
+    const note = el("div", "cost-note");
+    note.innerHTML = `Сравнение с baseline (производство + переналадки + переработка + дефицит): `
+      + `<b>${fmtMoney(comparable)}</b> против <b>${fmtMoney(DATA.baseline.total_cost)}</b>, `
+      + `экономия <b>${fmtMoney(-diff)}</b>.`;
+    root.appendChild(note);
+  }
+}
+
+/* ---------- Footer ---------- */
+function renderFoot(s) {
+  const sol = s.plan.solver;
+  const gap = sol.mip_gap == null ? "—" : pct(sol.mip_gap);
+  const time = sol.solve_time_s == null ? "—" : sol.solve_time_s + " с";
+  $("#foot").innerHTML =
+    `Сценарий: <b>${s.name}</b> · MILP (HiGHS) · gap ${gap} · ${time} · `
+    + `собрано ${DATA.meta.built_at}<br>`
+    + `Демо-данные, не данные завода. Модель: производство, переналадки по семействам, `
+    + `склад, срок хранения, сырьё, переработка, дефицит.`;
+  $("#note").textContent = `${DATA.meta.sku_count} SKU · ${DATA.meta.line_count} линии · `
+    + `${DATA.meta.weeks} недель · демо-данные`;
+}
+
+/* ---------- Selects ---------- */
+function fillSelects() {
+  const skuSel = $("#skuSelect");
+  clear(skuSel);
+  for (const sku of DATA.skus) {
+    const opt = el("option", "", sku.name);
+    opt.value = sku.id;
+    skuSel.appendChild(opt);
+  }
+  skuSel.value = state.sku;
+  skuSel.onchange = () => { state.sku = skuSel.value; renderInventory(current()); };
+
+  const matSel = $("#matSelect");
+  clear(matSel);
+  for (const mat of DATA.materials) {
+    const opt = el("option", "", mat.name);
+    opt.value = mat.id;
+    matSel.appendChild(opt);
+  }
+  matSel.value = state.material;
+  matSel.onchange = () => { state.material = matSel.value; renderMaterials(current()); };
+}
+
+/* ---------- Scenario bar ---------- */
+/* ---------- What-if ---------- */
+function setupWhatif() {
+  const section = $("#whatifSection");
+  const note = $("#whatifNote");
+  const status = $("#whatifStatus");
+  const btn = $("#solveBtn");
+  const demand = $("#demandMult");
+  const supplies = {
+    milk: $("#supplyMilk"), cream: $("#supplyCream"), sugar: $("#supplySugar"),
+    cocoa: $("#supplyCocoa"), packaging: $("#supplyPackaging")
+  };
+  const labels = {
+    demand: $("#demandMultVal"),
+    milk: $("#supplyMilkVal"), cream: $("#supplyCreamVal"),
+    sugar: $("#supplySugarVal"), cocoa: $("#supplyCocoaVal"),
+    packaging: $("#supplyPackagingVal")
+  };
+  const multipliers = {
+    shelf: $("#shelfMult"), safety: $("#safetyMult"), overtime: $("#overtimeMult")
+  };
+  const multLabels = {
+    shelf: $("#shelfMultVal"), safety: $("#safetyMultVal"), overtime: $("#overtimeMultVal")
+  };
+  const lineDown = $("#lineDown");
+  let apiReady = false;
+
+  function buildOverrideTable() {
+    const wrap = $("#skuOverrides");
+    clear(wrap);
+    const table = el("table", "override-table");
+    const thead = el("thead");
+    thead.innerHTML = "<tr><th>SKU</th><th>Срок, нед</th><th>Запас, шт</th></tr>";
+    table.appendChild(thead);
+    const tbody = el("tbody");
+    for (const sku of DATA.skus) {
+      const tr = el("tr");
+      tr.innerHTML = `<td>${sku.name}</td>
+        <td><input type="number" min="1" max="52" step="1" data-sku="${sku.id}" data-field="shelf_weeks" placeholder="${sku.shelf}"></td>
+        <td><input type="number" min="0" max="1000000" step="1" data-sku="${sku.id}" data-field="safety_units" placeholder="${sku.safety}"></td>`;
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+  }
+
+  function collectOverrides() {
+    const result = {};
+    document.querySelectorAll("#skuOverrides input").forEach(input => {
+      const value = input.value.trim();
+      if (value === "") return;
+      const sku = input.dataset.sku;
+      const field = input.dataset.field;
+      result[sku] = result[sku] || {};
+      result[sku][field] = parseFloat(value);
+    });
+    return result;
+  }
+
+  function buildLineTable() {
+    const wrap = $("#lineOverrides");
+    clear(wrap);
+    const table = el("table", "override-table");
+    const thead = el("thead");
+    thead.innerHTML = "<tr><th>Линия</th><th>Лимит переработки, ч/нед</th></tr>";
+    table.appendChild(thead);
+    const tbody = el("tbody");
+    for (const line of DATA.lines) {
+      const tr = el("tr");
+      tr.innerHTML = `<td>${line.id}</td>
+        <td><input type="number" min="0" max="168" step="0.5" data-line="${line.id}" placeholder="${line.overtime_max}"></td>`;
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+  }
+
+  function collectLineOverrides() {
+    const result = {};
+    document.querySelectorAll("#lineOverrides input").forEach(input => {
+      const value = input.value.trim();
+      if (value === "") return;
+      result[input.dataset.line] = parseFloat(value);
+    });
+    return result;
+  }
+
+  function buildLineHoursTable() {
+    const wrap = $("#lineHoursOverrides");
+    clear(wrap);
+    const table = el("table", "override-table");
+    const thead = el("thead");
+    thead.innerHTML = "<tr><th>Линия</th><th>Часы смен, ч/нед</th></tr>";
+    table.appendChild(thead);
+    const tbody = el("tbody");
+    for (const line of DATA.lines) {
+      const tr = el("tr");
+      tr.innerHTML = `<td>${line.id}</td>
+        <td><input type="number" min="0" max="168" step="1" data-line="${line.id}" placeholder="${line.hours}"></td>`;
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+  }
+
+  function collectLineHoursOverrides() {
+    const result = {};
+    document.querySelectorAll("#lineHoursOverrides input").forEach(input => {
+      const value = input.value.trim();
+      if (value === "") return;
+      result[input.dataset.line] = parseFloat(value);
+    });
+    return result;
+  }
+
+  const fmtMult = (v) => Number(v).toFixed(2).replace(".", ",");
+  function syncLabels() {
+    labels.demand.textContent = fmtMult(demand.value);
+    for (const [key, input] of Object.entries(supplies)) {
+      labels[key].textContent = fmtMult(input.value);
+    }
+    for (const [key, input] of Object.entries(multipliers)) {
+      multLabels[key].textContent = fmtMult(input.value);
+    }
+    const shelfMult = parseFloat(multipliers.shelf.value);
+    const safetyMult = parseFloat(multipliers.safety.value);
+    document.querySelectorAll("#skuOverrides input").forEach(input => {
+      const sku = DATA.skus.find(s => s.id === input.dataset.sku);
+      if (!sku) return;
+      if (input.dataset.field === "shelf_weeks") {
+        input.placeholder = String(Math.max(1, Math.round(sku.shelf * shelfMult)));
+      } else {
+        input.placeholder = String(Math.max(0, Math.round(sku.safety * safetyMult)));
+      }
+    });
+    const overtimeMult = parseFloat(multipliers.overtime.value);
+    document.querySelectorAll("#lineOverrides input").forEach(input => {
+      const line = DATA.lines.find(l => l.id === input.dataset.line);
+      if (!line) return;
+      input.placeholder = (line.overtime_max * overtimeMult)
+        .toFixed(1).replace(".", ",");
+    });
+  }
+  function setEnabled(enabled, message) {
+    apiReady = enabled;
+    section.classList.toggle("disabled", !enabled);
+    demand.disabled = !enabled;
+    Object.values(supplies).forEach(x => { x.disabled = !enabled; });
+    Object.values(multipliers).forEach(x => { x.disabled = !enabled; });
+    document.querySelectorAll("#skuOverrides input, #lineOverrides input, #lineHoursOverrides input, #resetOverrides").forEach(x => { x.disabled = !enabled; });
+    lineDown.disabled = !enabled;
+    btn.disabled = !enabled;
+    note.textContent = message;
+  }
+  demand.addEventListener("input", syncLabels);
+  Object.values(supplies).forEach(x => x.addEventListener("input", syncLabels));
+  Object.values(multipliers).forEach(x => x.addEventListener("input", syncLabels));
+  buildOverrideTable();
+  buildLineTable();
+  buildLineHoursTable();
+  $("#resetOverrides").addEventListener("click", () => {
+    document.querySelectorAll("#skuOverrides input, #lineOverrides input, #lineHoursOverrides input").forEach(i => { i.value = ""; });
+  });
+  syncLabels();
+
+  async function checkApi() {
+    if (location.protocol === "file:") {
+      setEnabled(false, "Открой через API: python -m uvicorn src.api:app --port 8000");
+      return;
+    }
+    try {
+      const r = await fetch("/api/health");
+      if (!r.ok) throw new Error("health " + r.status);
+      setEnabled(true, "Меняй параметры и нажми «Пересчитать»");
+    } catch (e) {
+      setEnabled(false, "API не запущен. Запусти python -m uvicorn src.api:app --port 8000");
+    }
+  }
+
+  async function solve() {
+    if (!apiReady) return;
+    btn.disabled = true;
+    status.classList.remove("error");
+    status.textContent = "Считаю…";
+    const body = {
+      demand_mult: parseFloat(demand.value),
+      supply_mult: {
+        milk: parseFloat(supplies.milk.value),
+        cream: parseFloat(supplies.cream.value),
+        sugar: parseFloat(supplies.sugar.value),
+        cocoa: parseFloat(supplies.cocoa.value),
+        packaging: parseFloat(supplies.packaging.value)
+      },
+      shelf_mult: parseFloat(multipliers.shelf.value),
+      safety_mult: parseFloat(multipliers.safety.value),
+      overtime_mult: parseFloat(multipliers.overtime.value),
+      sku_overrides: collectOverrides(),
+      overtime_overrides: collectLineOverrides(),
+      line_hours_overrides: collectLineHoursOverrides(),
+      line_down: lineDown.value || null,
+      time_limit: 60,
+      mip_gap: 0.01
+    };
+    try {
+      const r = await fetch("/api/solve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const resp = await r.json();
+      if (!r.ok || resp.status !== "ok") {
+        throw new Error(resp.detail || resp.message || ("HTTP " + r.status));
+      }
+      DATA.scenarios.custom = {
+        id: "custom",
+        name: "Свой сценарий",
+        demand_mult: resp.scenario.demand_mult,
+        line_down: resp.scenario.line_down,
+        shelf_mult: resp.scenario.shelf_mult,
+        safety_mult: resp.scenario.safety_mult,
+        overtime_mult: resp.scenario.overtime_mult,
+        sku_overrides: resp.scenario.sku_overrides,
+        overtime_overrides: resp.scenario.overtime_overrides,
+        line_hours_overrides: resp.scenario.line_hours_overrides,
+        plan: resp.plan,
+        demand: resp.demand,
+        sku_demand: resp.sku_demand,
+        supply: resp.supply
+      };
+      state.scenario = "custom";
+      renderScenarioBar();
+      renderAll();
+      const gap = resp.plan.solver.mip_gap;
+      const seconds = Number(resp.solve_time_s).toFixed(1).replace(".", ",");
+      status.textContent = `Готово за ${seconds} с`
+        + (gap == null ? "" : `, gap ${pct(gap)}`);
+    } catch (e) {
+      status.classList.add("error");
+      status.textContent = "Не удалось: " + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  btn.addEventListener("click", solve);
+  checkApi();
+}
+
+function renderScenarioBar() {
+  const bar = $("#scenarioBar");
+  clear(bar);
+  for (const [id, s] of Object.entries(DATA.scenarios)) {
+    const btn = el("button", "scenario-btn" + (id === state.scenario ? " on" : ""), s.name);
+    btn.onclick = () => {
+      state.scenario = id;
+      renderScenarioBar();
+      renderAll();
+    };
+    bar.appendChild(btn);
+  }
+}
+
+function renderAll() {
+  const s = current();
+  renderKpis(s);
+  renderGantt(s);
+  renderLoad(s);
+  renderLineSummary(s);
+  renderInventory(s);
+  renderMaterials(s);
+  renderSeasonality(s);
+  renderCosts(s);
+  renderFoot(s);
+}
+
+fillSelects();
+renderScenarioBar();
+renderAll();
+setupWhatif();
+</script>
+</body>
+</html>
